@@ -125,30 +125,12 @@ export async function GET(request: Request) {
       }
     }
 
-    // One-time cleanup: delete low-quality signals already in DB
-    try {
-      const cleanupClient = createAdminClient()
-      const { data: junk, error: junkErr } = await cleanupClient
-        .from('signals')
-        .select('id, title, impact_score, affected_sectors')
-        .or('impact_score.lte.3,affected_sectors.eq.{}')
-      
-      if (!junkErr && junk && junk.length > 0) {
-        // Only delete signals that have BOTH low score AND empty sectors
-        const toDelete = junk.filter((s: any) => {
-          const score = s?.impact_score ?? 0
-          const sectors = s?.affected_sectors ?? []
-          return score <= 3 || sectors.length === 0
-        })
-        if (toDelete.length > 0) {
-          const ids = toDelete.map((s: any) => s.id)
-          console.log(`[signals] Cleaning up ${ids.length} low-quality signals from DB`)
-          await cleanupClient.from('signals').delete().in('id', ids)
-        }
-      }
-    } catch (cleanErr: any) {
-      console.error('[signals] Cleanup failed (non-fatal):', cleanErr?.message)
-    }
+    // Read params
+    const offset = parseInt(searchParams?.get?.('offset') ?? '0') || 0
+    const search = searchParams?.get?.('search')?.trim?.() ?? ''
+
+    // 90-day window
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
 
     // Use admin client to read signals — they're public data, no need for RLS
     const readClient = createAdminClient()
@@ -158,22 +140,31 @@ export async function GET(request: Request) {
       .select('*')
       .gt('impact_score', 3)                    // Only show signals with real impact
       .not('affected_sectors', 'eq', '{}')      // Must have at least one affected sector
+      .gte('event_date', ninetyDaysAgo)         // 90-day retention window
       .order('event_date', { ascending: false })
-      .limit(limit)
+      .range(offset, offset + limit)            // Pagination via offset
 
     if (sector && sector !== 'all') {
       query = query.contains('affected_sectors', [sector])
+    }
+
+    // Server-side text search (title, tickers via ilike)
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%`)
     }
 
     const { data, error } = await query
 
     if (error) {
       console.error('[signals] Read FAILED:', error.message, error.details)
-      return NextResponse.json({ signals: [], error: error?.message ?? 'Database error' }, { status: 200 })
+      return NextResponse.json({ signals: [], hasMore: false, error: error?.message ?? 'Database error' }, { status: 200 })
     }
 
-    console.log(`[signals] Returning ${data?.length ?? 0} signals to client`)
-    return NextResponse.json({ signals: data ?? [] })
+    const hasMore = (data?.length ?? 0) > limit
+    const signals = hasMore ? data?.slice(0, limit) : (data ?? [])
+
+    console.log(`[signals] Returning ${signals?.length ?? 0} signals to client (offset=${offset}, hasMore=${hasMore})`)
+    return NextResponse.json({ signals, hasMore })
   } catch (error: any) {
     console.error('Signals API error:', error)
     return NextResponse.json({ signals: [], error: error?.message ?? 'Failed to fetch signals' }, { status: 500 })

@@ -8,13 +8,15 @@ import Button from '@/components/ui/Button'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import { createClient } from '@/lib/supabase/client'
 import type { Signal } from '@/lib/types'
-import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
   bullish: { color: 'text-hill-green', bg: 'bg-hill-green/10', border: 'border-hill-green/30', label: 'Bullish', Icon: TrendingUp },
   bearish: { color: 'text-hill-red', bg: 'bg-hill-red/10', border: 'border-hill-red/30', label: 'Bearish', Icon: TrendingDown },
   neutral: { color: 'text-hill-blue', bg: 'bg-hill-blue/10', border: 'border-hill-blue/30', label: 'Neutral', Icon: Minus },
 }
+
+const PAGE_SIZE = 20
 
 interface DashboardClientProps {
   userEmail: string
@@ -32,21 +34,68 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [impactTooltip, setImpactTooltip] = useState<string | null>(null)
 
-  const fetchSignals = useCallback(async (refresh?: boolean) => {
+  // Search
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // Pagination
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  // User actions (favorites / dismissed)
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Re-fetch when search changes
+  useEffect(() => {
+    if (!loading) {
+      fetchSignals(false, true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch])
+
+  // Fetch user actions (favorites + dismissed)
+  const fetchUserActions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/signals/actions')
+      if (!res.ok) return
+      const data = await res.json()
+      setFavorites(new Set(data?.favorites ?? []))
+      setDismissed(new Set(data?.dismissed ?? []))
+    } catch {
+      // Non-critical — user just won't see stars/dismissals
+    }
+  }, [])
+
+  const fetchSignals = useCallback(async (refresh?: boolean, resetList?: boolean) => {
     try {
       if (refresh) {
         setRefreshing(true)
         setPolling(true)
-      } else {
+      } else if (resetList) {
         setLoading(true)
       }
       setError(null)
 
-      const res = await fetch(`/api/signals${refresh ? '?refresh=true&force=true' : ''}`)
+      const params = new URLSearchParams()
+      if (refresh) { params.set('refresh', 'true'); params.set('force', 'true') }
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      params.set('limit', String(PAGE_SIZE))
+
+      const res = await fetch(`/api/signals?${params.toString()}`)
       const data = await res?.json?.()
 
       if (!res?.ok) throw new Error(data?.error ?? 'Failed to fetch signals')
       setSignals(data?.signals ?? [])
+      setHasMore(data?.hasMore ?? false)
     } catch (err: any) {
       console.error('Failed to fetch signals:', err)
       setError(err?.message ?? 'Failed to load signals')
@@ -55,19 +104,79 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       setRefreshing(false)
       setPolling(false)
     }
+  }, [debouncedSearch])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const params = new URLSearchParams()
+      params.set('offset', String(signals.length))
+      params.set('limit', String(PAGE_SIZE))
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      if (selectedSector !== 'all') params.set('sector', selectedSector)
+
+      const res = await fetch(`/api/signals?${params.toString()}`)
+      const data = await res?.json?.()
+      if (!res?.ok) throw new Error(data?.error ?? 'Failed to load more')
+
+      setSignals(prev => [...prev, ...(data?.signals ?? [])])
+      setHasMore(data?.hasMore ?? false)
+    } catch (err: any) {
+      console.error('Failed to load more:', err)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, hasMore, signals.length, debouncedSearch, selectedSector])
+
+  // Toggle favorite/dismiss
+  const toggleAction = useCallback(async (signalId: string, action: 'favorite' | 'dismissed') => {
+    setActionLoading(`${signalId}-${action}`)
+    try {
+      const res = await fetch('/api/signals/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signal_id: signalId, action }),
+      })
+      if (!res.ok) return
+
+      const data = await res.json()
+      if (action === 'favorite') {
+        setFavorites(prev => {
+          const next = new Set(prev)
+          if (data?.status === 'added') next.add(signalId)
+          else next.delete(signalId)
+          return next
+        })
+      } else {
+        setDismissed(prev => {
+          const next = new Set(prev)
+          if (data?.status === 'added') next.add(signalId)
+          else next.delete(signalId)
+          return next
+        })
+      }
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null)
+    }
   }, [])
 
-  // On first load: fetch signals, and if empty, auto-trigger a poll
+  // On first load
   useEffect(() => {
     let cancelled = false
     async function init() {
       setLoading(true)
+      // Fetch user actions in parallel
+      fetchUserActions()
       try {
-        const res = await fetch('/api/signals')
+        const res = await fetch(`/api/signals?limit=${PAGE_SIZE}`)
         const data = await res?.json?.()
         if (cancelled) return
         const fetched = data?.signals ?? []
         setSignals(fetched)
+        setHasMore(data?.hasMore ?? false)
         setLoading(false)
 
         // If no signals exist yet, auto-poll Congress.gov
@@ -75,9 +184,12 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           setPolling(true)
           setRefreshing(true)
           try {
-            const pollRes = await fetch('/api/signals?refresh=true&force=true')
+            const pollRes = await fetch(`/api/signals?refresh=true&force=true&limit=${PAGE_SIZE}`)
             const pollData = await pollRes?.json?.()
-            if (!cancelled) setSignals(pollData?.signals ?? [])
+            if (!cancelled) {
+              setSignals(pollData?.signals ?? [])
+              setHasMore(pollData?.hasMore ?? false)
+            }
           } catch (err: any) {
             if (!cancelled) setError(err?.message ?? 'Failed to poll')
           } finally {
@@ -90,7 +202,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     }
     init()
     return () => { cancelled = true }
-  }, [])
+  }, [fetchUserActions])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -99,13 +211,17 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     router.refresh()
   }
 
-  const filteredSignals = selectedSector === 'all'
-    ? signals
-    : (signals ?? [])?.filter?.((s: Signal) =>
-        (s?.affected_sectors ?? [])?.some?.((sector: string) =>
-          sector?.toLowerCase?.()?.includes?.(selectedSector?.toLowerCase?.())
-        )
+  // Filter: hide dismissed, optionally show favorites only, apply sector filter
+  const visibleSignals = (signals ?? []).filter((s: Signal) => {
+    if (dismissed.has(s.id)) return false
+    if (showFavoritesOnly && !favorites.has(s.id)) return false
+    if (selectedSector !== 'all') {
+      return (s?.affected_sectors ?? []).some((sector: string) =>
+        sector?.toLowerCase?.()?.includes?.(selectedSector?.toLowerCase?.())
       )
+    }
+    return true
+  })
 
   const allSectors = Array.from(
     new Set((signals ?? [])?.flatMap?.((s: Signal) => s?.affected_sectors ?? [])?.filter?.(Boolean))
@@ -134,32 +250,61 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+        {/* Header row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-hill-white mb-2">Congressional Signal Feed</h1>
             <p className="text-hill-muted">Real-time intelligence from Congress.gov, analyzed by AI.</p>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => fetchSignals(true)} loading={refreshing} disabled={refreshing}>
+          <Button variant="secondary" size="sm" onClick={() => fetchSignals(true, true)} loading={refreshing} disabled={refreshing}>
             <RefreshCw size={14} className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Polling Congress.gov...' : 'Poll Now'}
           </Button>
         </div>
 
-        {/* Sector filter */}
-        <div className="mb-6 overflow-x-auto">
-          <div className="flex gap-2 pb-2">
-            {(sectors ?? [])?.map?.((sector: string) => (
-              <button key={sector} onClick={() => setSelectedSector(sector)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                  selectedSector === sector
-                    ? 'bg-hill-orange text-white'
-                    : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
-                }`}>
-                {sector === 'all' ? 'All Sectors' : sector}
-              </button>
-            ))}
+        {/* Search bar */}
+        <div className="relative mb-6">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-hill-muted" />
+          <input
+            type="text"
+            placeholder="Search signals by title, ticker, sector, keyword..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-hill-dark border border-hill-border rounded-lg pl-11 pr-4 py-3 text-sm text-hill-white placeholder:text-hill-muted focus:outline-none focus:border-hill-orange/50 transition-colors"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-hill-muted hover:text-hill-white">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Sector filter + favorites toggle */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="overflow-x-auto flex-1">
+            <div className="flex gap-2 pb-2">
+              {(sectors ?? [])?.map?.((sector: string) => (
+                <button key={sector} onClick={() => setSelectedSector(sector)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                    selectedSector === sector
+                      ? 'bg-hill-orange text-white'
+                      : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+                  }`}>
+                  {sector === 'all' ? 'All Sectors' : sector}
+                </button>
+              ))}
+            </div>
           </div>
+          <button
+            onClick={() => setShowFavoritesOnly(prev => !prev)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+              showFavoritesOnly
+                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+                : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+            }`}>
+            <Star size={14} className={showFavoritesOnly ? 'fill-yellow-400' : ''} />
+            {showFavoritesOnly ? 'Showing Favorites' : 'Favorites'}
+          </button>
         </div>
 
         {/* Polling banner */}
@@ -198,13 +343,16 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
         {/* Signal feed */}
         {!loading && !error && (
           <div className="space-y-4">
-            {(filteredSignals ?? [])?.map?.((signal: Signal) => {
+            {(visibleSignals ?? [])?.map?.((signal: Signal) => {
               const sentiment = sentimentConfig?.[signal?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
               const SentimentIcon = sentiment?.Icon ?? Minus
               const isExpanded = expandedId === signal?.id
+              const isFavorited = favorites.has(signal.id)
 
               return (
-                <div key={signal?.id} className="bg-hill-dark rounded-xl border border-hill-border hover:border-hill-border/80 transition-all duration-200 overflow-hidden">
+                <div key={signal?.id} className={`bg-hill-dark rounded-xl border transition-all duration-200 overflow-hidden ${
+                  isFavorited ? 'border-yellow-500/40 ring-1 ring-yellow-500/20' : 'border-hill-border hover:border-hill-border/80'
+                }`}>
                   {/* Main card */}
                   <div className="p-6">
                     {/* Header row */}
@@ -213,7 +361,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
                         <div className="flex items-center gap-2 text-xs text-hill-muted font-mono mb-2">
                           <span className="uppercase px-2 py-0.5 bg-hill-gray rounded">{signal?.event_type ?? 'signal'}</span>
                           {signal?.committee && <span>{signal.committee}</span>}
-                          <span>\u2022</span>
+                          <span>&bull;</span>
                           <span>{signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
                           {signal?.bill_number && (
                             <span className="text-hill-orange">{signal.bill_number}</span>
@@ -223,9 +371,32 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
                           <h2 className="text-lg font-semibold text-hill-white leading-tight">{signal?.title ?? 'Untitled'}</h2>
                         </Link>
                       </div>
-                      <div className={`flex items-center gap-2 px-3 py-1.5 rounded border text-sm font-mono ${sentiment?.bg ?? ''} ${sentiment?.border ?? ''} ${sentiment?.color ?? ''}`}>
-                        <SentimentIcon size={14} />
-                        {sentiment?.label ?? 'Neutral'}
+                      {/* Action buttons + sentiment */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleAction(signal.id, 'favorite')}
+                          disabled={actionLoading === `${signal.id}-favorite`}
+                          className={`p-2 rounded-lg transition-all ${
+                            isFavorited
+                              ? 'text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20'
+                              : 'text-hill-muted hover:text-yellow-400 hover:bg-hill-gray'
+                          }`}
+                          title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          <Star size={16} className={isFavorited ? 'fill-yellow-400' : ''} />
+                        </button>
+                        <button
+                          onClick={() => toggleAction(signal.id, 'dismissed')}
+                          disabled={actionLoading === `${signal.id}-dismissed`}
+                          className="p-2 rounded-lg text-hill-muted hover:text-hill-red hover:bg-hill-red/10 transition-all"
+                          title="Dismiss signal"
+                        >
+                          <X size={16} />
+                        </button>
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded border text-sm font-mono ${sentiment?.bg ?? ''} ${sentiment?.border ?? ''} ${sentiment?.color ?? ''}`}>
+                          <SentimentIcon size={14} />
+                          {sentiment?.label ?? 'Neutral'}
+                        </div>
                       </div>
                     </div>
 
@@ -287,7 +458,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
                           <ul className="space-y-1">
                             {(signal?.key_takeaways ?? [])?.map?.((takeaway: string, i: number) => (
                               <li key={i} className="text-sm text-hill-text flex items-start gap-2">
-                                <span className="text-hill-orange mt-1">\u2022</span>
+                                <span className="text-hill-orange mt-1">&bull;</span>
                                 {takeaway}
                               </li>
                             ))}
@@ -334,16 +505,36 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           </div>
         )}
 
+        {/* Load More button */}
+        {!loading && !error && hasMore && (
+          <div className="mt-6 text-center">
+            <Button variant="secondary" onClick={loadMore} loading={loadingMore} disabled={loadingMore}>
+              {loadingMore ? 'Loading...' : 'Load More Signals'}
+            </Button>
+          </div>
+        )}
+
         {/* Empty state */}
-        {!loading && !error && (filteredSignals?.length ?? 0) === 0 && (
+        {!loading && !error && (visibleSignals?.length ?? 0) === 0 && (
           <Card className="text-center py-12">
-            <p className="text-hill-muted mb-2">{(signals?.length ?? 0) === 0 ? 'No signals yet. Trigger a refresh to poll Congress.gov.' : 'No signals found for this sector.'}</p>
+            <p className="text-hill-muted mb-2">
+              {showFavoritesOnly ? 'No favorited signals yet. Star signals you want to track.' :
+               (signals?.length ?? 0) === 0 ? 'No signals yet. Trigger a refresh to poll Congress.gov.' :
+               debouncedSearch ? `No signals matching "${debouncedSearch}".` :
+               'No signals found for this sector.'}
+            </p>
             <div className="flex justify-center gap-4 mt-4">
               {(signals?.length ?? 0) === 0 && (
-                <Button onClick={() => fetchSignals(true)} loading={refreshing}>Poll Congress.gov</Button>
+                <Button onClick={() => fetchSignals(true, true)} loading={refreshing}>Poll Congress.gov</Button>
+              )}
+              {showFavoritesOnly && (
+                <Button variant="ghost" onClick={() => setShowFavoritesOnly(false)}>Show All Signals</Button>
               )}
               {selectedSector !== 'all' && (
                 <Button variant="ghost" onClick={() => setSelectedSector('all')}>View all sectors</Button>
+              )}
+              {debouncedSearch && (
+                <Button variant="ghost" onClick={() => setSearchQuery('')}>Clear Search</Button>
               )}
             </div>
           </Card>
@@ -365,12 +556,8 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
               <p className="text-2xl font-bold text-hill-red font-mono">{(signals ?? [])?.filter?.((s: Signal) => s?.sentiment === 'bearish')?.length ?? 0}</p>
             </div>
             <div className="bg-hill-dark rounded-lg p-4 border border-hill-border">
-              <p className="text-hill-muted text-xs mb-1">Avg Impact</p>
-              <p className="text-2xl font-bold text-hill-orange font-mono">
-                {(signals?.length ?? 0) > 0
-                  ? ((signals ?? [])?.reduce?.((sum: number, s: Signal) => sum + (s?.impact_score ?? 0), 0) / (signals?.length ?? 1))?.toFixed?.(1)
-                  : '0'}
-              </p>
+              <p className="text-hill-muted text-xs mb-1">Favorites</p>
+              <p className="text-2xl font-bold text-yellow-400 font-mono">{favorites.size}</p>
             </div>
           </div>
         )}
