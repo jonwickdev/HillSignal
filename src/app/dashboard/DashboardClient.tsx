@@ -62,6 +62,9 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch])
 
+  // Extra signals fetched by ID (favorites beyond 90-day window)
+  const [extraSignals, setExtraSignals] = useState<Signal[]>([])
+
   // Fetch user actions (favorites + dismissed)
   const fetchUserActions = useCallback(async () => {
     try {
@@ -70,8 +73,10 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       const data = await res.json()
       setFavorites(new Set(data?.favorites ?? []))
       setDismissed(new Set(data?.dismissed ?? []))
+      return { favorites: data?.favorites ?? [], dismissed: data?.dismissed ?? [] }
     } catch {
       // Non-critical — user just won't see stars/dismissals
+      return null
     }
   }, [])
 
@@ -163,13 +168,26 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     }
   }, [])
 
+  // Fetch favorited signals that may be outside the 90-day window
+  const fetchMissingFavorites = useCallback(async (favoriteIds: string[], loadedSignalIds: Set<string>) => {
+    const missingIds = favoriteIds.filter(id => !loadedSignalIds.has(id))
+    if (missingIds.length === 0) { setExtraSignals([]); return }
+    try {
+      const res = await fetch(`/api/signals?ids=${missingIds.join(',')}`)
+      const data = await res?.json?.()
+      setExtraSignals(data?.signals ?? [])
+    } catch {
+      // Non-critical
+    }
+  }, [])
+
   // On first load
   useEffect(() => {
     let cancelled = false
     async function init() {
       setLoading(true)
-      // Fetch user actions in parallel
-      fetchUserActions()
+      // Fetch user actions in parallel with signals
+      const actionsPromise = fetchUserActions()
       try {
         const res = await fetch(`/api/signals?limit=${PAGE_SIZE}`)
         const data = await res?.json?.()
@@ -178,6 +196,13 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
         setSignals(fetched)
         setHasMore(data?.hasMore ?? false)
         setLoading(false)
+
+        // Fetch any favorited signals that aren't in the main feed
+        const actions = await actionsPromise
+        if (!cancelled && actions?.favorites?.length) {
+          const loadedIds = new Set<string>(fetched.map((s: Signal) => s.id))
+          fetchMissingFavorites(actions.favorites, loadedIds)
+        }
 
         // If no signals exist yet, auto-poll Congress.gov
         if (fetched.length === 0) {
@@ -202,7 +227,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     }
     init()
     return () => { cancelled = true }
-  }, [fetchUserActions])
+  }, [fetchUserActions, fetchMissingFavorites])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -211,8 +236,15 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     router.refresh()
   }
 
+  // Merge main feed + extra favorited signals (older than 90 days)
+  const allSignals = (() => {
+    const mainIds = new Set((signals ?? []).map((s: Signal) => s.id))
+    const extras = (extraSignals ?? []).filter((s: Signal) => !mainIds.has(s.id))
+    return [...(signals ?? []), ...extras]
+  })()
+
   // Filter: hide dismissed, optionally show favorites only, apply sector filter
-  const visibleSignals = (signals ?? []).filter((s: Signal) => {
+  const visibleSignals = allSignals.filter((s: Signal) => {
     if (dismissed.has(s.id)) return false
     if (showFavoritesOnly && !favorites.has(s.id)) return false
     if (selectedSector !== 'all') {

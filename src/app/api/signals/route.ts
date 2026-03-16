@@ -128,12 +128,28 @@ export async function GET(request: Request) {
     // Read params
     const offset = parseInt(searchParams?.get?.('offset') ?? '0') || 0
     const search = searchParams?.get?.('search')?.trim?.() ?? ''
-
-    // 90-day window
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    const ids = searchParams?.get?.('ids')?.split?.(',')?.filter?.(Boolean) ?? []
 
     // Use admin client to read signals — they're public data, no need for RLS
     const readClient = createAdminClient()
+
+    // If specific IDs requested (e.g. favorited signals beyond 90 days), fetch by ID only
+    if (ids.length > 0) {
+      const { data: idData, error: idErr } = await readClient
+        .from('signals')
+        .select('*')
+        .in('id', ids)
+        .order('event_date', { ascending: false })
+
+      if (idErr) {
+        console.error('[signals] ID fetch FAILED:', idErr.message)
+        return NextResponse.json({ signals: [], hasMore: false }, { status: 200 })
+      }
+      return NextResponse.json({ signals: idData ?? [], hasMore: false })
+    }
+
+    // 90-day window for normal feed
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
 
     let query = readClient
       .from('signals')
