@@ -66,8 +66,20 @@ export async function GET(request: Request) {
               console.log(`[signals] Analyzing ${toAnalyze?.length} items with AI...`)
               const analyzed = await analyzeBatch(toAnalyze, 5)
 
+              // Quality gate: skip low-impact or vague analyses
+              const quality = (analyzed ?? []).filter((s: any) => {
+                const score = s?.impact_score ?? 0
+                const sectors = s?.affected_sectors ?? []
+                if (score <= 3 && sectors.length === 0) {
+                  console.log(`[signals] Skipping low-quality signal: "${s?.title?.slice?.(0, 50)}" (score=${score}, sectors=0)`)
+                  return false
+                }
+                return true
+              })
+              console.log(`[signals] ${quality.length}/${analyzed?.length ?? 0} passed quality gate`)
+
               let storedCount = 0
-              for (const signal of analyzed ?? []) {
+              for (const signal of quality ?? []) {
                 const { error: insertErr } = await adminClient.from('signals').insert({
                   event_type: signal?.event_type ?? 'bill',
                   title: signal?.title ?? 'Untitled',

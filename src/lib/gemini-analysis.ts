@@ -161,14 +161,20 @@ EXCLUDE (return empty array if all items fall into these):
 - Administrative: appointment of conferees, journal approval, ordering the previous question
 - Symbolic: sense-of-Congress resolutions with no binding authority or budget impact
 
-INCLUDE only if the item does at least ONE of these:
+ALSO EXCLUDE items where:
+- The title/description is too vague to determine ANY specific topic (e.g., just "Committee Meeting" or "Hearing" with no subject)
+- There is no indication of what policy, sector, or issue is being addressed
+- You cannot name a single specific sector, industry, or company that would be affected
+- The item is a generic scheduling notice with no substantive content
+
+INCLUDE only if the item does at least ONE of these AND you can identify a specific sector or policy area:
 - Creates, changes, or removes regulation on an industry (banking, tech, energy, healthcare, defense, etc.)
 - Appropriates significant funding (>$100M) or changes government spending priorities
 - Affects taxes, tariffs, trade policy, or interest rate-related policy
 - Impacts specific companies or sectors (pharma approvals, defense contracts, tech antitrust, etc.)
 - Changes labor law, immigration policy, or housing policy in ways that affect corporate costs or consumer spending
 - Involves sanctions, export controls, or foreign policy that affects trade
-- Committee hearings on market-relevant topics (Fed oversight, bank regulation, Big Tech, etc.)
+- Committee hearings on a clearly identified market-relevant topic (Fed oversight, bank regulation, Big Tech, etc.)
 
 Return a JSON object: {"relevant_indices": [0, 2, 5]}
 If NOTHING qualifies, return: {"relevant_indices": []}

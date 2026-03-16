@@ -184,21 +184,41 @@ export async function fetchCommitteeMeetings(limit: number = 20): Promise<RawCon
     const data = await fetchWithRetry(url)
     const meetings: any[] = data?.committeeMeetings ?? []
 
-    return (meetings ?? [])?.map?.((meeting: any) => ({
-      type: 'meeting' as const,
-      raw: meeting,
-      congress_gov_id: `meeting-${meeting?.eventId ?? 'unknown'}`,
-      title: meeting?.title ?? 'Committee Meeting',
-      description: [
-        meeting?.meetingStatus ?? '',
-        meeting?.committees?.map?.((c: any) => c?.name)?.join?.(', ') ?? '',
-      ]?.filter?.(Boolean)?.join?.('\n') ?? '',
-      date: meeting?.date ?? new Date().toISOString(),
-      source_url: meeting?.url ?? '',
-      committee: meeting?.committees?.[0]?.name ?? null,
-      legislators: [],
-      bill_number: null,
-    })) ?? []
+    return (meetings ?? [])
+      ?.filter?.((meeting: any) => {
+        // Reject meetings with no meaningful title/description
+        const title = (meeting?.title ?? '')?.toLowerCase?.()?.trim?.()
+        const hasGenericTitle = !title
+          || title === 'committee meeting'
+          || title === 'full committee'
+          || title === 'subcommittee meeting'
+          || title === 'hearing'
+          || title === 'markup'
+          || title === 'business meeting'
+          || title.length < 15
+        
+        // If the title is generic, there's no agenda info — skip it
+        if (hasGenericTitle) {
+          console.log(`[congress] Skipping vague meeting: "${meeting?.title}"`)
+          return false
+        }
+        return true
+      })
+      ?.map?.((meeting: any) => ({
+        type: 'meeting' as const,
+        raw: meeting,
+        congress_gov_id: `meeting-${meeting?.eventId ?? 'unknown'}`,
+        title: meeting?.title ?? 'Committee Meeting',
+        description: [
+          meeting?.meetingStatus ?? '',
+          meeting?.committees?.map?.((c: any) => c?.name)?.join?.(', ') ?? '',
+        ]?.filter?.(Boolean)?.join?.('\n') ?? '',
+        date: meeting?.date ?? new Date().toISOString(),
+        source_url: meeting?.url ?? '',
+        committee: meeting?.committees?.[0]?.name ?? null,
+        legislators: [],
+        bill_number: null,
+      })) ?? []
   } catch {
     return []
   }

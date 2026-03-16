@@ -105,9 +105,21 @@ async function runPoll() {
     const analyzed = await analyzeBatch(toAnalyze, 2)
     console.log(`Got ${analyzed?.length ?? 0} analyses`)
 
-    // 5. Store in Supabase (insert, not upsert — we already filtered duplicates)
+    // 5. Quality gate: skip low-impact or vague analyses
+    const quality = (analyzed ?? []).filter((s: any) => {
+      const score = s?.impact_score ?? 0
+      const sectors = s?.affected_sectors ?? []
+      if (score <= 3 && sectors.length === 0) {
+        console.log(`[cron] Skipping low-quality: "${s?.title?.slice?.(0, 50)}" (score=${score}, sectors=0)`)
+        return false
+      }
+      return true
+    })
+    console.log(`[cron] ${quality.length}/${analyzed?.length ?? 0} passed quality gate`)
+
+    // 6. Store in Supabase (insert, not upsert — we already filtered duplicates)
     let inserted = 0
-    for (const signal of analyzed ?? []) {
+    for (const signal of quality ?? []) {
       try {
         const { error: insertError } = await adminClient
           .from('signals')
