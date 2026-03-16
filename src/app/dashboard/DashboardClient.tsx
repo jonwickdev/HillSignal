@@ -26,6 +26,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
   const [signals, setSignals] = useState<Signal[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [polling, setPolling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedSector, setSelectedSector] = useState<string>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -33,8 +34,12 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
 
   const fetchSignals = useCallback(async (refresh?: boolean) => {
     try {
-      if (refresh) setRefreshing(true)
-      else setLoading(true)
+      if (refresh) {
+        setRefreshing(true)
+        setPolling(true)
+      } else {
+        setLoading(true)
+      }
       setError(null)
 
       const res = await fetch(`/api/signals${refresh ? '?refresh=true' : ''}`)
@@ -48,10 +53,44 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     } finally {
       setLoading(false)
       setRefreshing(false)
+      setPolling(false)
     }
   }, [])
 
-  useEffect(() => { fetchSignals() }, [fetchSignals])
+  // On first load: fetch signals, and if empty, auto-trigger a poll
+  useEffect(() => {
+    let cancelled = false
+    async function init() {
+      setLoading(true)
+      try {
+        const res = await fetch('/api/signals')
+        const data = await res?.json?.()
+        if (cancelled) return
+        const fetched = data?.signals ?? []
+        setSignals(fetched)
+        setLoading(false)
+
+        // If no signals exist yet, auto-poll Congress.gov
+        if (fetched.length === 0) {
+          setPolling(true)
+          setRefreshing(true)
+          try {
+            const pollRes = await fetch('/api/signals?refresh=true')
+            const pollData = await pollRes?.json?.()
+            if (!cancelled) setSignals(pollData?.signals ?? [])
+          } catch (err: any) {
+            if (!cancelled) setError(err?.message ?? 'Failed to poll')
+          } finally {
+            if (!cancelled) { setPolling(false); setRefreshing(false) }
+          }
+        }
+      } catch (err: any) {
+        if (!cancelled) { setError(err?.message ?? 'Failed to load'); setLoading(false) }
+      }
+    }
+    init()
+    return () => { cancelled = true }
+  }, [])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -101,9 +140,9 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
             <h1 className="text-2xl md:text-3xl font-bold text-hill-white mb-2">Congressional Signal Feed</h1>
             <p className="text-hill-muted">Real-time intelligence from Congress.gov, analyzed by AI.</p>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => fetchSignals(true)} loading={refreshing}>
+          <Button variant="secondary" size="sm" onClick={() => fetchSignals(true)} loading={refreshing} disabled={refreshing}>
             <RefreshCw size={14} className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            {refreshing ? 'Polling Congress.gov...' : 'Poll Now'}
           </Button>
         </div>
 
@@ -122,6 +161,17 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
             ))}
           </div>
         </div>
+
+        {/* Polling banner */}
+        {polling && !loading && (
+          <div className="mb-6 bg-hill-orange/10 border border-hill-orange/30 rounded-xl p-6 text-center">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <RefreshCw size={20} className="text-hill-orange animate-spin" />
+              <p className="text-hill-orange font-semibold">Fetching latest signals from Congress.gov...</p>
+            </div>
+            <p className="text-hill-muted text-sm">Pulling bills, votes, and committee actions then running AI analysis. This can take 30-60 seconds on first load.</p>
+          </div>
+        )}
 
         {/* Loading */}
         {loading && (
