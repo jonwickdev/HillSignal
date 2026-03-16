@@ -1,9 +1,9 @@
 # Nixpacks configuration for Railway deployment
-# Using Node.js 24 for eslint-visitor-keys@5.0.1 compatibility
-# eslint-visitor-keys requires: ^20.19.0 || ^22.13.0 || >=24
+# Using Node.js 22 (available in Nixpacks)
+# eslint-visitor-keys pinned to 4.x via package.json overrides
 
 [phases.setup]
-nixPkgs = ["nodejs_24", "npm-10_x"]
+nixPkgs = ["nodejs_22", "npm-10_x"]
 
 [phases.build]
 cmds = [
