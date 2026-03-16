@@ -1,0 +1,18 @@
+[main 449d222] 08ebe031-f2e1-4332-a804-450d8e7e06e1
+ 23 files changed, 8185 insertions(+), 208 deletions(-)
+ create mode 100644 .logs/20260316-183832-06a972d64ed64f63be7c7f74f51a33f4.retcode
+ create mode 100644 .logs/20260316-185548-27af8c8c34f046eca2413d0ddbf94c78.err
+ create mode 100644 .logs/20260316-185548-27af8c8c34f046eca2413d0ddbf94c78.out
+ create mode 100644 package-lock.json
+ create mode 100644 src/app/api/cron/poll-congress/route.ts
+ create mode 100644 src/app/api/settings/route.ts
+ create mode 100644 src/app/api/signals/[id]/route.ts
+ create mode 100644 src/app/api/signals/route.ts
+ create mode 100644 src/app/settings/SettingsClient.tsx
+ create mode 100644 src/app/settings/page.tsx
+ create mode 100644 src/app/signals/[id]/SignalDetailClient.tsx
+ create mode 100644 src/app/signals/[id]/page.tsx
+ create mode 100644 src/lib/congress-api.ts
+ create mode 100644 src/lib/gemini-analysis.ts
+ create mode 100644 supabase/migrations/002_phase2_signals_upgrade.sql
+###449d222cbb3af41479bedff1f0f18bcd82b7d654###
