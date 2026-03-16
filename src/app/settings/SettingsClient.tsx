@@ -79,7 +79,7 @@ export default function SettingsClient({ userEmail, preferences }: SettingsClien
     <div className="min-h-screen bg-hill-black">
       <header className="sticky top-0 z-50 bg-hill-black/80 backdrop-blur-md border-b border-hill-border">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-hill-white">Hill<span className="text-hill-orange">Signal</span></Link>
+          <Link href="/dashboard" className="text-xl font-bold text-hill-white">Hill<span className="text-hill-orange">Signal</span></Link>
           <Link href="/dashboard"><Button variant="ghost" size="sm"><ArrowLeft size={14} className="mr-2" /> Back to Feed</Button></Link>
         </div>
       </header>

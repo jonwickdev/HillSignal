@@ -265,7 +265,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       {/* Header */}
       <header className="sticky top-0 z-50 bg-hill-black/80 backdrop-blur-md border-b border-hill-border">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-hill-white">
+          <Link href="/dashboard" className="text-xl font-bold text-hill-white">
             Hill<span className="text-hill-orange">Signal</span>
           </Link>
           <div className="flex items-center gap-4">
