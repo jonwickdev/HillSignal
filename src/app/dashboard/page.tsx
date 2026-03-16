@@ -1,10 +1,12 @@
+export const dynamic = 'force-dynamic'
+
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
 
 /**
  * Dashboard page - protected route
- * Shows mock signal feed for demonstration
+ * Shows real Congressional signal feed from Supabase
  */
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
@@ -14,7 +16,6 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Fetch user preferences
   let preferences = null
   try {
     const { data } = await supabase
@@ -23,9 +24,9 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .single()
     preferences = data
-  } catch (e) {
+  } catch {
     // Preferences not set yet
   }
 
-  return <DashboardClient user={user} preferences={preferences} />
+  return <DashboardClient userEmail={user?.email ?? ''} preferences={preferences} />
 }
