@@ -1,8 +1,8 @@
 # Nixpacks configuration for Railway deployment
-# Ensures Node.js 20 LTS is used for Next.js 16+ compatibility
+# Ensures Node.js 22 LTS is used for eslint-visitor-keys compatibility
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm-9_x"]
+nixPkgs = ["nodejs_22", "npm-10_x"]
 
 [phases.build]
 cmds = ["npm ci", "npm run build"]
