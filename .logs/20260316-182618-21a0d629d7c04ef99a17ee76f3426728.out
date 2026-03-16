@@ -1,0 +1,62 @@
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+  ▲ Next.js 14.2.28
+  - Environments: .env
+  - Experiments (use with caution):
+    · outputFileTracingRoot
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Skipping linting
+   Checking validity of types ...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.build/types/**/*.ts'
+
+   Collecting page data ...
+   Generating static pages (0/13) ...
+   Generating static pages (3/13) 
+   Generating static pages (6/13) 
+   Generating static pages (9/13) 
+ ✓ Generating static pages (13/13)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ƒ /                                    5.01 kB         101 kB
+├ ○ /_not-found                          872 B          88.1 kB
+├ ƒ /api/checkout                        0 B                0 B
+├ ƒ /api/cron/poll-congress              0 B                0 B
+├ ○ /api/health                          0 B                0 B
+├ ƒ /api/pricing                         0 B                0 B
+├ ƒ /api/settings                        0 B                0 B
+├ ƒ /api/signals                         0 B                0 B
+├ ƒ /api/signals/[id]                    0 B                0 B
+├ ƒ /api/webhook                         0 B                0 B
+├ ƒ /auth/callback                       0 B                0 B
+├ ○ /checkout                            2.58 kB         154 kB
+├ ƒ /dashboard                           6.27 kB         158 kB
+├ ○ /login                               2.06 kB         153 kB
+├ ○ /privacy                             181 B          96.1 kB
+├ ƒ /settings                            4.46 kB         156 kB
+├ ƒ /signals/[id]                        4.06 kB         100 kB
+├ ○ /signup                              2.65 kB         154 kB
+├ ○ /success                             3.11 kB         155 kB
+└ ○ /terms                               181 B          96.1 kB
++ First Load JS shared by all            87.2 kB
+  ├ chunks/156-3afd8bf3d1bae483.js       31.7 kB
+  ├ chunks/ceb5afef-3a541ea5d7f25fa4.js  53.6 kB
+  └ other shared chunks (total)          1.95 kB
+
+
+ƒ Middleware                             75.1 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+exit_code=0

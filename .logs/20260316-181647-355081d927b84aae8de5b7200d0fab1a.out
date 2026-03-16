@@ -1,0 +1,18 @@
+➤ YN0000: · Yarn 4.12.0
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + @prisma/client@npm:6.7.0, prisma@npm:6.7.0, @esbuild/aix-ppc64@npm:0.27.4, @esbuild/android-arm64@npm:0.27.4, @esbuild/android-arm@npm:0.27.4, and 91 more.
+➤ YN0000: └ Completed in 1s 117ms
+➤ YN0000: ┌ Post-resolution validation
+➤ YN0002: │ root-workspace-0b6124@workspace:. doesn't provide react (p63559e), requested by lucide-react.
+➤ YN0086: │ Some peer dependencies are incorrectly met by your project; run yarn explain peer-requirements <hash> for details, where <hash> is the six-letter p-prefixed code.
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 5 packages were added to the project (+ 11.62 MiB).
+➤ YN0000: └ Completed in 0s 529ms
+➤ YN0000: ┌ Link step
+➤ YN0007: │ @prisma/engines@npm:6.7.0 must be built because it never has been before or the last one failed
+➤ YN0007: │ esbuild@npm:0.27.4 must be built because it never has been before or the last one failed
+➤ YN0007: │ prisma@npm:6.7.0 [dc3fc] must be built because it never has been before or the last one failed
+➤ YN0007: │ @prisma/client@npm:6.7.0 [dc3fc] must be built because it never has been before or the last one failed
+➤ YN0000: └ Completed in 3s 187ms
+➤ YN0000: · Done with warnings in 4s 883ms

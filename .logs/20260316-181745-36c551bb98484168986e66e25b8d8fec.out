@@ -1,0 +1,12 @@
+Internal Error: Package for app@workspace:. not found in the project
+    at Object.MT (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:189:930)
+    at NC.execute (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:524:681)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async NC.validateAndExecute (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:94:787)
+    at async t.run (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:98:3263)
+    at async gC.execute (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:435:497)
+    at async gC.validateAndExecute (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:94:787)
+    at async t.run (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:98:3263)
+    at async SPt (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:752:8034)
+    at async VR (/opt/hostedapp/cache/xdg/node/corepack/v1/yarn/4.12.0/yarn.js:753:142)
+exit_code=1

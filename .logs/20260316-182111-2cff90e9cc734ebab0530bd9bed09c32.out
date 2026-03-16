@@ -1,0 +1,19 @@
+Unlinked Node Modules
+➤ YN0000: · Yarn 4.13.0
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + @aws-sdk/client-s3@npm:3.1009.0, @aws-sdk/s3-request-presigner@npm:3.1009.0, @azure/storage-blob@npm:12.31.0, @floating-ui/react@npm:0.26.0, and 1166 more.
+➤ YN0085: │ - root-workspace-0b6124@workspace:.
+➤ YN0000: └ Completed in 1s 853ms
+➤ YN0000: ┌ Post-resolution validation
+➤ YN0060: │ @typescript-eslint/parser is listed by your project with version 7.0.0 (p6cb6c0), which doesn't satisfy what @typescript-eslint/eslint-plugin requests (^6.0.0-alpha).
+➤ YN0060: │ eslint is listed by your project with version 9.24.0 (pe6e000), which doesn't satisfy what @typescript-eslint/eslint-plugin and other dependencies request (^8.57.0).
+➤ YN0002: │ app@workspace:. doesn't provide prettier (pd88b5f), requested by eslint-plugin-prettier.
+➤ YN0086: │ Some peer dependencies are incorrectly met by your project; run yarn explain peer-requirements <hash> for details, where <hash> is the six-letter p-prefixed code.
+➤ YN0086: │ Some peer dependencies are incorrectly met by dependencies; run yarn explain peer-requirements for details.
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0000: └ Completed in 0s 936ms
+➤ YN0000: ┌ Link step
+➤ YN0000: └ Completed in 1m 3s
+➤ YN0000: · Done with warnings in 1m 6s
+Environment variables loaded from .env

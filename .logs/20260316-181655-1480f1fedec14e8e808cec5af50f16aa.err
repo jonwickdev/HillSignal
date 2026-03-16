@@ -1,0 +1,10 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 127.0.0.1:3000...
+* connect to 127.0.0.1 port 3000 failed: Connection refused
+*   Trying [::1]:3000...
+* Immediate connect fail for ::1: Cannot assign requested address
+* Failed to connect to localhost port 3000 after 0 ms: Couldn't connect to server
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+* Closing connection 0
+curl: (7) Failed to connect to localhost port 3000 after 0 ms: Couldn't connect to server

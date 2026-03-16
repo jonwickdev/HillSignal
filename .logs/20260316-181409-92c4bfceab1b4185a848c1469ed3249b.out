@@ -1,0 +1,4 @@
+Usage Error: Couldn't find a script named "tsc".
+
+$ yarn run [--inspect] [--inspect-brk] [-T,--top-level] [-B,--binaries-only] [--require #0] <scriptName> ...
+exit_code=1

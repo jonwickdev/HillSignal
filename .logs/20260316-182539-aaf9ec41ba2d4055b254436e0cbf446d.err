@@ -1,0 +1,64 @@
+ ⨯ Error: Neither apiKey nor config.authenticator provided
+    at Stripe._setAuthenticator (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7963:23)
+    at new Stripe (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7901:14)
+    at (rsc)/./lib/stripe.ts (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:2583:16)
+    at __webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at (rsc)/./app/page.tsx (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:1756:69)
+    at Function.__webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at async Promise.all (index 0)
+digest: "977173450"
+ ⨯ Error: Neither apiKey nor config.authenticator provided
+    at Stripe._setAuthenticator (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7963:23)
+    at new Stripe (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7901:14)
+    at (rsc)/./lib/stripe.ts (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:2583:16)
+    at __webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at (rsc)/./app/page.tsx (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:1756:69)
+    at Function.__webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at async Promise.all (index 0)
+digest: "977173450"
+Error: Neither apiKey nor config.authenticator provided
+    at Stripe._setAuthenticator (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7963:23)
+    at new Stripe (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7901:14)
+    at (rsc)/./lib/stripe.ts (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:2583:16)
+    at __webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at (rsc)/./app/page.tsx (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:1756:69)
+    at Function.__webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:555:9)
+    at process.processTimers (node:internal/timers:529:7)
+    at async e7 (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:396972)
+    at async tS (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:400486)
+    at async tw (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:401047)
+    at async tw (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:401178)
+    at async tO (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:36:2320)
+    at async /opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:36:2989 {
+  digest: '2320939920'
+}
+ ⨯ Error: Neither apiKey nor config.authenticator provided
+    at Stripe._setAuthenticator (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7963:23)
+    at new Stripe (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7901:14)
+    at (rsc)/./lib/stripe.ts (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:2583:16)
+    at __webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at (rsc)/./app/page.tsx (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:1756:69)
+    at Function.__webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+digest: "2320939920"
+ ⨯ Error: Neither apiKey nor config.authenticator provided
+    at Stripe._setAuthenticator (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7963:23)
+    at new Stripe (/home/ubuntu/hillsignal/nextjs_space/.next/server/vendor-chunks/stripe.js:7901:14)
+    at (rsc)/./lib/stripe.ts (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:2583:16)
+    at __webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at (rsc)/./app/page.tsx (/home/ubuntu/hillsignal/nextjs_space/.next/server/app/page.js:1756:69)
+    at Function.__webpack_require__ (/home/ubuntu/hillsignal/nextjs_space/.next/server/webpack-runtime.js:25:42)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:555:9)
+    at process.processTimers (node:internal/timers:529:7)
+    at async e7 (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:396972)
+    at async tS (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:400486)
+    at async tw (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:401047)
+    at async tw (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:35:401178)
+    at async tO (/opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:36:2320)
+    at async /opt/hostedapp/node/root/app/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:36:2989 {
+  digest: '2320939920',
+  page: '/'
+}
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (140kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)

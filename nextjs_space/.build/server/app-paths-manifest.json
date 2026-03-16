@@ -1,0 +1,22 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/health/route": "app/api/health/route.js",
+  "/checkout/page": "app/checkout/page.js",
+  "/api/checkout/route": "app/api/checkout/route.js",
+  "/api/signals/[id]/route": "app/api/signals/[id]/route.js",
+  "/api/cron/poll-congress/route": "app/api/cron/poll-congress/route.js",
+  "/api/pricing/route": "app/api/pricing/route.js",
+  "/auth/callback/route": "app/auth/callback/route.js",
+  "/api/settings/route": "app/api/settings/route.js",
+  "/api/signals/route": "app/api/signals/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/page": "app/page.js",
+  "/api/webhook/route": "app/api/webhook/route.js",
+  "/settings/page": "app/settings/page.js",
+  "/signals/[id]/page": "app/signals/[id]/page.js",
+  "/privacy/page": "app/privacy/page.js",
+  "/success/page": "app/success/page.js",
+  "/(auth)/signup/page": "app/(auth)/signup/page.js",
+  "/terms/page": "app/terms/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js"
+}
