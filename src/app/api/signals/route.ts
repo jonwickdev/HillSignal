@@ -125,12 +125,39 @@ export async function GET(request: Request) {
       }
     }
 
+    // One-time cleanup: delete low-quality signals already in DB
+    try {
+      const cleanupClient = createAdminClient()
+      const { data: junk, error: junkErr } = await cleanupClient
+        .from('signals')
+        .select('id, title, impact_score, affected_sectors')
+        .or('impact_score.lte.3,affected_sectors.eq.{}')
+      
+      if (!junkErr && junk && junk.length > 0) {
+        // Only delete signals that have BOTH low score AND empty sectors
+        const toDelete = junk.filter((s: any) => {
+          const score = s?.impact_score ?? 0
+          const sectors = s?.affected_sectors ?? []
+          return score <= 3 || sectors.length === 0
+        })
+        if (toDelete.length > 0) {
+          const ids = toDelete.map((s: any) => s.id)
+          console.log(`[signals] Cleaning up ${ids.length} low-quality signals from DB`)
+          await cleanupClient.from('signals').delete().in('id', ids)
+        }
+      }
+    } catch (cleanErr: any) {
+      console.error('[signals] Cleanup failed (non-fatal):', cleanErr?.message)
+    }
+
     // Use admin client to read signals — they're public data, no need for RLS
     const readClient = createAdminClient()
 
     let query = readClient
       .from('signals')
       .select('*')
+      .gt('impact_score', 3)                    // Only show signals with real impact
+      .not('affected_sectors', 'eq', '{}')      // Must have at least one affected sector
       .order('event_date', { ascending: false })
       .limit(limit)
 
