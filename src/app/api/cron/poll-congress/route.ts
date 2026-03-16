@@ -1,22 +1,37 @@
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
 import { fetchAllRecent } from '@/lib/congress-api'
-import { analyzeBatch } from '@/lib/gemini-analysis'
+import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
 import { createAdminClient } from '@/lib/supabase/server'
 
 /**
- * POST /api/cron/poll-congress
- * Polls Congress.gov for recent activity, analyzes with Gemini, stores in Supabase.
+ * GET /api/cron/poll-congress
+ * Vercel cron triggers this via GET.
+ * Polls Congress.gov for recent activity, analyzes with RouteLLM, stores in Supabase.
  */
+export async function GET(request: Request) {
+  // Verify cron secret if set (Vercel sends this header)
+  const authHeader = request.headers.get('authorization')
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return runPoll()
+}
+
+/** POST handler kept for manual triggers */
 export async function POST(request: Request) {
+  return runPoll()
+}
+
+async function runPoll() {
   const startTime = Date.now()
-  
+
   try {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json({
-        error: 'SUPABASE_SERVICE_ROLE_KEY not configured. Cannot write to database.',
-        hint: 'Set the SUPABASE_SERVICE_ROLE_KEY environment variable.',
+        error: 'SUPABASE_SERVICE_ROLE_KEY not configured.',
       }, { status: 503 })
     }
 
@@ -36,7 +51,7 @@ export async function POST(request: Request) {
       // First poll - no state yet
     }
 
-    // Check if we polled recently (within 10 min) to avoid hammering
+    // Cooldown: skip if polled within 10 min
     if (fromDateTime) {
       const lastPoll = new Date(fromDateTime)?.getTime?.() ?? 0
       const tenMinAgo = Date.now() - 10 * 60 * 1000
@@ -75,19 +90,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: 'ok', message: 'All items already processed', items_fetched: rawItems?.length ?? 0 })
     }
 
-    // 3. Analyze with Gemini (batch, max 10 items per poll to control costs)
-    const toAnalyze = newItems?.slice?.(0, 10) ?? []
-    console.log(`Analyzing ${toAnalyze?.length ?? 0} items with Gemini...`)
+    // 3. Pre-filter for market relevance (AI filter)
+    const relevant = await filterForMarketRelevance(newItems ?? [])
+    console.log(`${relevant?.length ?? 0} items passed market-relevance filter`)
+
+    if ((relevant?.length ?? 0) === 0) {
+      await updatePollState(adminClient, rawItems?.length ?? 0, 0, null)
+      return NextResponse.json({ status: 'ok', message: 'No market-relevant items', items_fetched: rawItems?.length ?? 0, items_new: newItems?.length ?? 0 })
+    }
+
+    // 4. Analyze with RouteLLM (max 10 items per poll)
+    const toAnalyze = relevant?.slice?.(0, 10) ?? []
+    console.log(`Analyzing ${toAnalyze?.length ?? 0} items with RouteLLM...`)
     const analyzed = await analyzeBatch(toAnalyze, 2)
     console.log(`Got ${analyzed?.length ?? 0} analyses`)
 
-    // 4. Store in Supabase
+    // 5. Store in Supabase (insert, not upsert — we already filtered duplicates)
     let inserted = 0
     for (const signal of analyzed ?? []) {
       try {
         const { error: insertError } = await adminClient
           .from('signals')
-          .upsert({
+          .insert({
             event_type: signal?.event_type ?? 'bill',
             title: signal?.title ?? 'Untitled',
             summary: signal?.summary ?? '',
@@ -104,7 +128,7 @@ export async function POST(request: Request) {
             event_date: signal?.event_date ?? new Date().toISOString(),
             key_takeaways: signal?.key_takeaways ?? [],
             market_implications: signal?.market_implications ?? null,
-          }, { onConflict: 'congress_gov_id' })
+          })
 
         if (insertError) {
           console.error('Insert error:', insertError?.message)
@@ -116,7 +140,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. Update poll state
+    // 6. Update poll state
     await updatePollState(adminClient, rawItems?.length ?? 0, inserted, null)
 
     const elapsed = Date.now() - startTime
@@ -124,6 +148,7 @@ export async function POST(request: Request) {
       status: 'ok',
       items_fetched: rawItems?.length ?? 0,
       items_new: newItems?.length ?? 0,
+      items_relevant: relevant?.length ?? 0,
       items_analyzed: analyzed?.length ?? 0,
       items_stored: inserted,
       elapsed_ms: elapsed,

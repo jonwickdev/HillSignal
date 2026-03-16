@@ -136,6 +136,49 @@ export async function analyzeCongressItem(item: RawCongressItem): Promise<Partia
   }
 }
 
+/**
+ * Pre-filter: sends all item titles/descriptions to AI in one call
+ * and asks which ones have real potential market impact.
+ * This saves per-item analysis calls on procedural junk.
+ */
+export async function filterForMarketRelevance(items: RawCongressItem[]): Promise<RawCongressItem[]> {
+  const apiKey = getApiKey()
+  if (!apiKey || items.length === 0) return items
+
+  const itemList = items.map((item, i) => 
+    `${i}: [${item.type}] ${item.title}${item.bill_number ? ` (${item.bill_number})` : ''} — ${item.description?.slice?.(0, 120) ?? 'No details'}`
+  ).join('\n')
+
+  const filterPrompt = `You are a Congressional market analyst. Review these Congressional items and identify which ones could have ANY potential impact on financial markets, specific sectors, or publicly traded companies.
+
+ITEMS:
+${itemList}
+
+Return a JSON object with a single key "relevant_indices" containing an array of the index numbers (integers) of items that have market relevance. Exclude purely procedural items (e.g., "Providing for consideration of..." rules, quorum calls, adjournment motions, ceremonial resolutions with no economic component, renaming post offices). Include items even if the impact is indirect or future-oriented.
+
+Example: {"relevant_indices": [0, 2, 5, 7]}
+
+Respond with raw JSON only.`
+
+  try {
+    const content = await callRouteLLM(filterPrompt, apiKey)
+    const parsed = JSON.parse(content ?? '{}')
+    const indices: number[] = parsed?.relevant_indices ?? []
+    
+    if (indices.length === 0) {
+      console.log('[ai] Filter returned 0 relevant items — falling back to all')
+      return items
+    }
+
+    return indices
+      .filter(i => i >= 0 && i < items.length)
+      .map(i => items[i])
+  } catch (err: any) {
+    console.error('[ai] Filter failed, using all items:', err?.message)
+    return items
+  }
+}
+
 export async function analyzeBatch(items: RawCongressItem[], maxConcurrent: number = 3): Promise<Array<Partial<Signal>>> {
   const results: Array<Partial<Signal>> = []
   

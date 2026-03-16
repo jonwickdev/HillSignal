@@ -4,7 +4,7 @@ export const maxDuration = 60
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllRecent } from '@/lib/congress-api'
-import { analyzeBatch } from '@/lib/gemini-analysis'
+import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
 
 /**
  * GET /api/signals
@@ -57,8 +57,13 @@ export async function GET(request: Request) {
             const newItems = (rawItems ?? [])?.filter?.((item: any) => !existingIds?.has?.(item?.congress_gov_id))
 
             if ((newItems?.length ?? 0) > 0) {
-              const toAnalyze = newItems?.slice?.(0, 5) ?? []
-              console.log(`[signals] Analyzing ${toAnalyze?.length} new items with AI...`)
+              // Pre-filter: ask AI which items have real market impact
+              console.log(`[signals] Pre-filtering ${newItems.length} items for market relevance...`)
+              const relevant = await filterForMarketRelevance(newItems)
+              console.log(`[signals] ${relevant.length}/${newItems.length} items deemed market-relevant`)
+
+              const toAnalyze = relevant?.slice?.(0, 10) ?? []
+              console.log(`[signals] Analyzing ${toAnalyze?.length} items with AI...`)
               const analyzed = await analyzeBatch(toAnalyze, 5)
 
               let storedCount = 0
