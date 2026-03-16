@@ -55,9 +55,9 @@ export async function GET(request: Request) {
             const newItems = (rawItems ?? [])?.filter?.((item: any) => !existingIds?.has?.(item?.congress_gov_id))
 
             if ((newItems?.length ?? 0) > 0) {
-              const toAnalyze = newItems?.slice?.(0, 10) ?? []
-              console.log(`[signals] Analyzing ${toAnalyze?.length} new items with Gemini...`)
-              const analyzed = await analyzeBatch(toAnalyze, 3)
+              const toAnalyze = newItems?.slice?.(0, 5) ?? []
+              console.log(`[signals] Analyzing ${toAnalyze?.length} new items with AI...`)
+              const analyzed = await analyzeBatch(toAnalyze, 5)
 
               for (const signal of analyzed ?? []) {
                 try {

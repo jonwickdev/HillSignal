@@ -1,6 +1,7 @@
 /**
- * Gemini AI Analysis Engine (Direct Google API)
- * Analyzes Congressional events for market implications
+ * Gemini AI Analysis Engine
+ * Supports both direct Google Gemini API (GEMINI_API_KEY) 
+ * and Abacus AI RouteLLM proxy (ABACUSAI_API_KEY)
  */
 
 import type { Signal } from '@/lib/types'
@@ -41,12 +42,76 @@ Rules:
 
 Respond with raw JSON only. No markdown, no code blocks.`
 
+function getApiConfig(): { type: 'google' | 'routellm'; key: string } | null {
+  // Try Google Gemini direct API first
+  const geminiKey = process.env.GEMINI_API_KEY
+  if (geminiKey) return { type: 'google', key: geminiKey }
+  // Fall back to Abacus AI RouteLLM proxy
+  const abacusKey = process.env.ABACUSAI_API_KEY
+  if (abacusKey) return { type: 'routellm', key: abacusKey }
+  return null
+}
+
+async function callGeminiDirect(prompt: string, apiKey: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: 'You are a Congressional market intelligence analyst. Output only valid JSON.' }] },
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 2000,
+          responseMimeType: 'application/json',
+        },
+      }),
+      signal: AbortSignal.timeout(15000),
+    }
+  )
+  if (!response?.ok) {
+    const errText = await response?.text?.() ?? ''
+    throw new Error(`Google Gemini API ${response?.status}: ${errText?.slice?.(0, 200)}`)
+  }
+  const data = await response?.json?.()
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+}
+
+async function callRouteLLM(prompt: string, apiKey: string): Promise<string> {
+  const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: 'You are a Congressional market intelligence analyst. Output only valid JSON.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 2000,
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+    }),
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!response?.ok) {
+    const errText = await response?.text?.() ?? ''
+    throw new Error(`RouteLLM API ${response?.status}: ${errText?.slice?.(0, 200)}`)
+  }
+  const data = await response?.json?.()
+  return data?.choices?.[0]?.message?.content ?? ''
+}
+
 export async function analyzeCongressItem(item: RawCongressItem): Promise<Partial<Signal> | null> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    console.error('GEMINI_API_KEY not configured')
+  const config = getApiConfig()
+  if (!config) {
+    console.error('[gemini] No API key found. Set GEMINI_API_KEY or ABACUSAI_API_KEY.')
     return null
   }
+  console.log(`[gemini] Using ${config.type} API for: ${item?.title?.slice?.(0, 60)}`)
 
   const prompt = ANALYSIS_PROMPT
     ?.replace?.('{type}', item?.type ?? 'unknown')
@@ -57,46 +122,25 @@ export async function analyzeCongressItem(item: RawCongressItem): Promise<Partia
     ?.replace?.('{committee}', item?.committee ?? 'N/A')
     ?.replace?.('{legislators}', item?.legislators?.join?.(', ') ?? 'N/A')
 
-  const systemInstruction = 'You are a Congressional market intelligence analyst. Output only valid JSON.'
-
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 2000,
-            responseMimeType: 'application/json',
-          },
-        }),
-        signal: AbortSignal.timeout(30000),
-      }
-    )
+    const content = config.type === 'google'
+      ? await callGeminiDirect(prompt, config.key)
+      : await callRouteLLM(prompt, config.key)
 
-    if (!response?.ok) {
-      const errText = await response?.text?.() ?? 'Unknown error'
-      console.error(`Gemini API error: ${response?.status}`, errText)
+    if (!content) {
+      console.error('[gemini] Empty response')
       return null
     }
-
-    const data = await response?.json?.()
-    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 
     let analysis: any
     try {
       analysis = JSON.parse(content ?? '{}')
     } catch {
-      // Try to extract JSON from response
       const jsonMatch = content?.match?.(/\{[\s\S]*\}/)
       if (jsonMatch?.[0]) {
         analysis = JSON.parse(jsonMatch[0])
       } else {
-        console.error('Failed to parse Gemini response:', content?.slice?.(0, 200))
+        console.error('[gemini] Failed to parse response:', content?.slice?.(0, 200))
         return null
       }
     }
@@ -120,7 +164,7 @@ export async function analyzeCongressItem(item: RawCongressItem): Promise<Partia
       market_implications: analysis?.market_implications ?? null,
     }
   } catch (err: any) {
-    console.error('Gemini analysis failed:', err?.message)
+    console.error(`[gemini] Analysis failed (${config.type}):`, err?.message)
     return null
   }
 }

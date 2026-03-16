@@ -89,7 +89,7 @@ async function fetchWithRetry(url: string, retries: number = 2): Promise<any> {
     try {
       const response = await fetch(url, {
         headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(8000),
       })
       if (!response?.ok) {
         if (response?.status === 429 && i < retries) {
@@ -106,56 +106,45 @@ async function fetchWithRetry(url: string, retries: number = 2): Promise<any> {
   }
 }
 
-export async function fetchRecentBills(fromDateTime?: string, limit: number = 50): Promise<RawCongressItem[]> {
+export async function fetchRecentBills(fromDateTime?: string, limit: number = 10): Promise<RawCongressItem[]> {
   const apiKey = getApiKey()
   if (!apiKey) throw new Error('CONGRESS_API_KEY not configured')
 
-  let url = `${BASE_URL}/bill?api_key=${apiKey}&format=json&sort=updateDate+desc&limit=${limit}`
+  // Keep limit small to stay within Vercel timeout (10s hobby / 60s pro)
+  const fetchLimit = Math.min(limit, 10)
+  let url = `${BASE_URL}/bill?api_key=${apiKey}&format=json&sort=updateDate+desc&limit=${fetchLimit}`
   if (fromDateTime) {
     url += `&fromDateTime=${fromDateTime}`
   }
 
+  console.log(`[congress] Fetching up to ${fetchLimit} bills...`)
   const data = await fetchWithRetry(url)
   const bills: any[] = data?.bills ?? []
+  console.log(`[congress] Got ${bills?.length ?? 0} bills from list endpoint`)
 
-  const results: RawCongressItem[] = []
-
-  for (const bill of bills?.slice?.(0, 20) ?? []) {
-    // Fetch bill details for richer data
-    let detail: any = null
-    try {
-      const detailUrl = `${BASE_URL}/bill/${bill?.congress}/${bill?.type?.toLowerCase?.()}/${bill?.number}?api_key=${apiKey}&format=json`
-      const detailData = await fetchWithRetry(detailUrl)
-      detail = detailData?.bill ?? null
-    } catch {
-      // Use basic bill data if detail fetch fails
-    }
-
-    const sponsors = detail?.sponsors ?? []
-    const policyArea = detail?.policyArea?.name ?? bill?.policyArea?.name ?? null
+  // Use list data directly — NO individual detail fetches (saves 10-20 HTTP calls)
+  return (bills ?? []).map((bill: any) => {
+    const policyArea = bill?.policyArea?.name ?? null
     const billNumber = `${bill?.type ?? ''}${bill?.number ?? ''}`
-    const congressGovUrl = `https://www.congress.gov/bill/${bill?.congress ?? '119'}th-congress/${(bill?.originChamber ?? 'house')?.toLowerCase?.()}-bill/${bill?.number ?? ''}`
+    const chamber = (bill?.originChamber ?? 'house')?.toLowerCase?.()
+    const congressGovUrl = `https://www.congress.gov/bill/${bill?.congress ?? '119'}th-congress/${chamber}-bill/${bill?.number ?? ''}`
 
-    results.push({
-      type: 'bill',
-      raw: detail ?? bill,
+    return {
+      type: 'bill' as const,
+      raw: bill,
       congress_gov_id: `bill-${bill?.congress}-${billNumber}`,
       title: bill?.title ?? 'Untitled Bill',
       description: [
         bill?.latestAction?.text ?? '',
         policyArea ? `Policy Area: ${policyArea}` : '',
-        sponsors?.length ? `Sponsors: ${sponsors?.map?.((s: any) => `${s?.fullName ?? 'Unknown'} (${s?.party ?? '?'}-${s?.state ?? '?'})`)?.join?.(', ')}` : '',
-        detail?.cosponsors?.count ? `Cosponsors: ${detail?.cosponsors?.count}` : '',
-      ]?.filter?.(Boolean)?.join?.('\n') ?? '',
+      ].filter(Boolean).join('\n'),
       date: bill?.latestAction?.actionDate ?? bill?.updateDate ?? new Date().toISOString(),
       source_url: congressGovUrl,
       committee: null,
-      legislators: sponsors?.map?.((s: any) => `${s?.fullName ?? 'Unknown'} (${s?.party ?? '?'}-${s?.state ?? '?'})`) ?? [],
+      legislators: [],
       bill_number: billNumber,
-    })
-  }
-
-  return results
+    }
+  })
 }
 
 export async function fetchRecentVotes(limit: number = 20): Promise<RawCongressItem[]> {
@@ -218,26 +207,22 @@ export async function fetchCommitteeMeetings(limit: number = 20): Promise<RawCon
 export async function fetchAllRecent(fromDateTime?: string): Promise<RawCongressItem[]> {
   const results: RawCongressItem[] = []
 
-  try {
-    const bills = await fetchRecentBills(fromDateTime, 30)
-    results.push(...(bills ?? []))
-  } catch (err: any) {
-    console.error('Failed to fetch bills:', err?.message)
-  }
+  // Fetch bills, votes, meetings IN PARALLEL to save time on Vercel
+  const [billsResult, votesResult, meetingsResult] = await Promise.allSettled([
+    fetchRecentBills(fromDateTime, 8),
+    fetchRecentVotes(5),
+    fetchCommitteeMeetings(5),
+  ])
 
-  try {
-    const votes = await fetchRecentVotes(10)
-    results.push(...(votes ?? []))
-  } catch (err: any) {
-    console.error('Failed to fetch votes:', err?.message)
-  }
+  if (billsResult?.status === 'fulfilled') results.push(...(billsResult.value ?? []))
+  else console.error('Failed to fetch bills:', (billsResult as any)?.reason?.message)
 
-  try {
-    const meetings = await fetchCommitteeMeetings(10)
-    results.push(...(meetings ?? []))
-  } catch (err: any) {
-    console.error('Failed to fetch meetings:', err?.message)
-  }
+  if (votesResult?.status === 'fulfilled') results.push(...(votesResult.value ?? []))
+  else console.error('Failed to fetch votes:', (votesResult as any)?.reason?.message)
 
+  if (meetingsResult?.status === 'fulfilled') results.push(...(meetingsResult.value ?? []))
+  else console.error('Failed to fetch meetings:', (meetingsResult as any)?.reason?.message)
+
+  console.log(`[congress] fetchAllRecent total: ${results.length} items`)
   return results
 }
