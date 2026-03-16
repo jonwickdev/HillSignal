@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request?.url ?? '')
     const refresh = searchParams?.get?.('refresh') === 'true'
+    const force = searchParams?.get?.('force') === 'true'
     const sector = searchParams?.get?.('sector')
     const limit = parseInt(searchParams?.get?.('limit') ?? '50') || 50
 
@@ -24,21 +25,23 @@ export async function GET(request: Request) {
         console.log('[signals] Refresh requested — running poll inline...')
         const adminClient = createAdminClient()
 
-        // Check rate limit (10 min cooldown)
+        // Check rate limit (2 min cooldown, skipped if force=true)
         let skipPoll = false
-        try {
-          const { data: pollState } = await adminClient
-            .from('poll_state')
-            .select('last_poll_time')
-            .single()
-          if (pollState?.last_poll_time) {
-            const lastPoll = new Date(pollState.last_poll_time)?.getTime?.() ?? 0
-            if (lastPoll > Date.now() - 10 * 60 * 1000) {
-              console.log('[signals] Skipping poll — last poll was < 10 min ago')
-              skipPoll = true
+        if (!force) {
+          try {
+            const { data: pollState } = await adminClient
+              .from('poll_state')
+              .select('last_poll_time')
+              .single()
+            if (pollState?.last_poll_time) {
+              const lastPoll = new Date(pollState.last_poll_time)?.getTime?.() ?? 0
+              if (lastPoll > Date.now() - 2 * 60 * 1000) {
+                console.log('[signals] Skipping poll — last poll was < 2 min ago')
+                skipPoll = true
+              }
             }
-          }
-        } catch { /* first poll */ }
+          } catch { /* first poll */ }
+        }
 
         if (!skipPoll) {
           const rawItems = await fetchAllRecent()

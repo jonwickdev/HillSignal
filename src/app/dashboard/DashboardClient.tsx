@@ -42,7 +42,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       }
       setError(null)
 
-      const res = await fetch(`/api/signals${refresh ? '?refresh=true' : ''}`)
+      const res = await fetch(`/api/signals${refresh ? '?refresh=true&force=true' : ''}`)
       const data = await res?.json?.()
 
       if (!res?.ok) throw new Error(data?.error ?? 'Failed to fetch signals')
@@ -75,7 +75,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           setPolling(true)
           setRefreshing(true)
           try {
-            const pollRes = await fetch('/api/signals?refresh=true')
+            const pollRes = await fetch('/api/signals?refresh=true&force=true')
             const pollData = await pollRes?.json?.()
             if (!cancelled) setSignals(pollData?.signals ?? [])
           } catch (err: any) {
