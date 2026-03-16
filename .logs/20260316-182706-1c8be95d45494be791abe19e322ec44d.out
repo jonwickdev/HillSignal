@@ -6,3 +6,13 @@
 
  ✓ Starting...
  ✓ Ready in 1755ms
+ ✓ Compiled /middleware in 476ms (122 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 2.2s (752 modules)
+ GET / 200 in 2581ms
+ GET / 200 in 113ms
+ ✓ Compiled /api/signals in 200ms (509 modules)
+ GET /api/signals?limit=4 200 in 352ms
+ GET /api/signals?limit=4 200 in 93ms
+ GET / 200 in 156ms
+ GET / 200 in 360ms
