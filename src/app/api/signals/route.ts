@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
               let storedCount = 0
               for (const signal of analyzed ?? []) {
-                const { error: upsertErr } = await adminClient.from('signals').upsert({
+                const { error: insertErr } = await adminClient.from('signals').insert({
                   event_type: signal?.event_type ?? 'bill',
                   title: signal?.title ?? 'Untitled',
                   summary: signal?.summary ?? '',
@@ -80,9 +80,9 @@ export async function GET(request: Request) {
                   event_date: signal?.event_date ?? new Date().toISOString(),
                   key_takeaways: signal?.key_takeaways ?? [],
                   market_implications: signal?.market_implications ?? null,
-                }, { onConflict: 'congress_gov_id' })
-                if (upsertErr) {
-                  console.error('[signals] Upsert FAILED:', upsertErr.message, upsertErr.details, upsertErr.hint)
+                })
+                if (insertErr) {
+                  console.error('[signals] Insert FAILED:', insertErr.message, insertErr.details)
                 } else {
                   storedCount++
                 }
