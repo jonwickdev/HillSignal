@@ -1,0 +1,11 @@
+# Nixpacks configuration for Railway deployment
+# Ensures Node.js 20 LTS is used for Next.js 16+ compatibility
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x"]
+
+[phases.build]
+cmds = ["npm ci", "npm run build"]
+
+[start]
+cmd = "npm run start"
