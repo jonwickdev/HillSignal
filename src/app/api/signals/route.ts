@@ -2,10 +2,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllRecent } from '@/lib/congress-api'
 import { analyzeBatch } from '@/lib/gemini-analysis'
-import { createAdminClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/signals
@@ -62,31 +61,33 @@ export async function GET(request: Request) {
               console.log(`[signals] Analyzing ${toAnalyze?.length} new items with AI...`)
               const analyzed = await analyzeBatch(toAnalyze, 5)
 
+              let storedCount = 0
               for (const signal of analyzed ?? []) {
-                try {
-                  await adminClient.from('signals').upsert({
-                    event_type: signal?.event_type ?? 'bill',
-                    title: signal?.title ?? 'Untitled',
-                    summary: signal?.summary ?? '',
-                    full_analysis: signal?.full_analysis ?? null,
-                    impact_score: signal?.impact_score ?? 5,
-                    sentiment: signal?.sentiment ?? 'neutral',
-                    affected_sectors: signal?.affected_sectors ?? [],
-                    tickers: signal?.tickers ?? [],
-                    source_url: signal?.source_url ?? null,
-                    congress_gov_id: signal?.congress_gov_id ?? null,
-                    bill_number: signal?.bill_number ?? null,
-                    committee: signal?.committee ?? null,
-                    legislators: signal?.legislators ?? [],
-                    event_date: signal?.event_date ?? new Date().toISOString(),
-                    key_takeaways: signal?.key_takeaways ?? [],
-                    market_implications: signal?.market_implications ?? null,
-                  }, { onConflict: 'congress_gov_id' })
-                } catch (err: any) {
-                  console.error('Insert error:', err?.message)
+                const { error: upsertErr } = await adminClient.from('signals').upsert({
+                  event_type: signal?.event_type ?? 'bill',
+                  title: signal?.title ?? 'Untitled',
+                  summary: signal?.summary ?? '',
+                  full_analysis: signal?.full_analysis ?? null,
+                  impact_score: signal?.impact_score ?? 5,
+                  sentiment: signal?.sentiment ?? 'neutral',
+                  affected_sectors: signal?.affected_sectors ?? [],
+                  tickers: signal?.tickers ?? [],
+                  source_url: signal?.source_url ?? null,
+                  congress_gov_id: signal?.congress_gov_id ?? null,
+                  bill_number: signal?.bill_number ?? null,
+                  committee: signal?.committee ?? null,
+                  legislators: signal?.legislators ?? [],
+                  event_date: signal?.event_date ?? new Date().toISOString(),
+                  key_takeaways: signal?.key_takeaways ?? [],
+                  market_implications: signal?.market_implications ?? null,
+                }, { onConflict: 'congress_gov_id' })
+                if (upsertErr) {
+                  console.error('[signals] Upsert FAILED:', upsertErr.message, upsertErr.details, upsertErr.hint)
+                } else {
+                  storedCount++
                 }
               }
-              console.log(`[signals] Stored ${analyzed?.length ?? 0} new signals`)
+              console.log(`[signals] Successfully stored ${storedCount}/${analyzed?.length ?? 0} signals`)
             }
           }
 
@@ -107,9 +108,10 @@ export async function GET(request: Request) {
       }
     }
 
-    const supabase = await createServerSupabaseClient()
+    // Use admin client to read signals — they're public data, no need for RLS
+    const readClient = createAdminClient()
 
-    let query = supabase
+    let query = readClient
       .from('signals')
       .select('*')
       .order('event_date', { ascending: false })
@@ -122,10 +124,11 @@ export async function GET(request: Request) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Supabase signals error:', error)
+      console.error('[signals] Read FAILED:', error.message, error.details)
       return NextResponse.json({ signals: [], error: error?.message ?? 'Database error' }, { status: 200 })
     }
 
+    console.log(`[signals] Returning ${data?.length ?? 0} signals to client`)
     return NextResponse.json({ signals: data ?? [] })
   } catch (error: any) {
     console.error('Signals API error:', error)
