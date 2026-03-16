@@ -1,16 +1,11 @@
 # Nixpacks configuration for Railway deployment
-# Using Node.js 22 (available in Nixpacks)
-# eslint-visitor-keys pinned to 4.x via package.json overrides
+# Keep it simple - let Railway handle caching
 
 [phases.setup]
 nixPkgs = ["nodejs_22", "npm-10_x"]
 
 [phases.build]
-cmds = [
-  "npm cache clean --force",
-  "npm ci --prefer-offline",
-  "npm run build"
-]
+cmds = ["npm ci", "npm run build"]
 
 [start]
 cmd = "npm run start"
