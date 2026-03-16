@@ -149,16 +149,31 @@ export async function filterForMarketRelevance(items: RawCongressItem[]): Promis
     `${i}: [${item.type}] ${item.title}${item.bill_number ? ` (${item.bill_number})` : ''} — ${item.description?.slice?.(0, 120) ?? 'No details'}`
   ).join('\n')
 
-  const filterPrompt = `You are a Congressional market analyst. Review these Congressional items and identify which ones could have ANY potential impact on financial markets, specific sectors, or publicly traded companies.
+  const filterPrompt = `You are a senior Congressional market analyst filtering items for retail investors. Be STRICT — only keep items that could move markets, affect stock prices, or change conditions for a specific industry or publicly traded company.
 
 ITEMS:
 ${itemList}
 
-Return a JSON object with a single key "relevant_indices" containing an array of the index numbers (integers) of items that have market relevance. Exclude purely procedural items (e.g., "Providing for consideration of..." rules, quorum calls, adjournment motions, ceremonial resolutions with no economic component, renaming post offices). Include items even if the impact is indirect or future-oriented.
+EXCLUDE (return empty array if all items fall into these):
+- Procedural: "Providing for consideration of...", quorum calls, adjournment motions, cloture votes on motions to proceed, rules committee procedures
+- Ceremonial: post office renamings, commemorative resolutions, National [X] Day/Week/Month, honoring individuals, congratulatory resolutions
+- Routine reauthorizations with no policy change (e.g., extending existing programs as-is)
+- Administrative: appointment of conferees, journal approval, ordering the previous question
+- Symbolic: sense-of-Congress resolutions with no binding authority or budget impact
 
-Example: {"relevant_indices": [0, 2, 5, 7]}
+INCLUDE only if the item does at least ONE of these:
+- Creates, changes, or removes regulation on an industry (banking, tech, energy, healthcare, defense, etc.)
+- Appropriates significant funding (>$100M) or changes government spending priorities
+- Affects taxes, tariffs, trade policy, or interest rate-related policy
+- Impacts specific companies or sectors (pharma approvals, defense contracts, tech antitrust, etc.)
+- Changes labor law, immigration policy, or housing policy in ways that affect corporate costs or consumer spending
+- Involves sanctions, export controls, or foreign policy that affects trade
+- Committee hearings on market-relevant topics (Fed oversight, bank regulation, Big Tech, etc.)
 
-Respond with raw JSON only.`
+Return a JSON object: {"relevant_indices": [0, 2, 5]}
+If NOTHING qualifies, return: {"relevant_indices": []}
+
+Raw JSON only.`
 
   try {
     const content = await callRouteLLM(filterPrompt, apiKey)
@@ -166,8 +181,8 @@ Respond with raw JSON only.`
     const indices: number[] = parsed?.relevant_indices ?? []
     
     if (indices.length === 0) {
-      console.log('[ai] Filter returned 0 relevant items — falling back to all')
-      return items
+      console.log('[ai] Filter returned 0 relevant items — nothing market-relevant this batch')
+      return []
     }
 
     return indices
