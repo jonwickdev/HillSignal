@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import { createClient } from '@/lib/supabase/client'
 import type { Signal } from '@/lib/types'
-import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search, User } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
   bullish: { color: 'text-hill-green', bg: 'bg-hill-green/10', border: 'border-hill-green/30', label: 'Bullish', Icon: TrendingUp },
@@ -271,6 +271,11 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           <div className="flex items-center gap-4">
             <LiveIndicator />
             <span className="text-hill-muted text-sm hidden sm:inline">{userEmail}</span>
+            <Link href="/profile">
+              <button className="text-hill-muted hover:text-hill-white transition-colors p-2" aria-label="Profile">
+                <User size={18} />
+              </button>
+            </Link>
             <Link href="/settings">
               <button className="text-hill-muted hover:text-hill-white transition-colors p-2" aria-label="Settings">
                 <Settings size={18} />
