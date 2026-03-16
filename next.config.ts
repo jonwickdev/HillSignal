@@ -1,9 +1,6 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for optimized Docker/Railway deployment
-  output: 'standalone',
-  
   // Security headers
   async headers() {
     return [

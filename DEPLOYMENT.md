@@ -1,14 +1,14 @@
 # HillSignal Deployment Guide
 
-This guide walks you through deploying HillSignal to Railway with Supabase and Stripe integration.
+This guide walks you through deploying HillSignal to Vercel with Supabase and Stripe integration.
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
 2. [Supabase Setup](#supabase-setup)
 3. [Stripe Setup](#stripe-setup)
-4. [Railway Deployment](#railway-deployment)
-5. [Domain Configuration (Namecheap)](#domain-configuration-namecheap)
+4. [Vercel Deployment](#vercel-deployment)
+5. [Domain Configuration](#domain-configuration)
 6. [Post-Deployment](#post-deployment)
 7. [Troubleshooting](#troubleshooting)
 
@@ -18,8 +18,8 @@ This guide walks you through deploying HillSignal to Railway with Supabase and S
 
 - [Supabase account](https://supabase.com) (free tier works)
 - [Stripe account](https://stripe.com) (free to create)
-- [Railway account](https://railway.app) (free tier available)
-- Domain registered with Namecheap (hillsignal.com)
+- [Vercel account](https://vercel.com) (free tier available)
+- Domain registered (hillsignal.com)
 - Git installed locally
 
 ---
@@ -34,7 +34,7 @@ This guide walks you through deploying HillSignal to Railway with Supabase and S
 4. Click on **API** in the left menu
 
 You'll see:
-- **Project URL**: `https://oiwuwllrtjiqrpmadqiu.supabase.co`
+- **Project URL**: `https://your-project.supabase.co`
 - **anon public key**: Safe to use in client-side code
 - **service_role key**: ⚠️ **KEEP SECRET** - Only use server-side
 
@@ -46,13 +46,13 @@ You'll see:
 2. Scroll down to **Project API keys**
 3. Find `service_role` (it says "This key has the ability to bypass Row Level Security")
 4. Click the eye icon to reveal it, or click "Copy"
-5. Save this securely - you'll need it for Railway
+5. Save this securely - you'll need it for Vercel
 
 ### Step 3: Run Database Migration
 
 1. In Supabase Dashboard, go to **SQL Editor**
 2. Click **New query**
-3. Copy the entire contents of `supabase/migrations/001_initial_schema.sql`
+3. Copy the entire contents of `supabase/SUPABASE_SETUP.sql`
 4. Paste into the SQL Editor
 5. Click **Run** (or press Cmd/Ctrl + Enter)
 6. You should see "Success. No rows returned"
@@ -85,7 +85,7 @@ You'll see:
 
 ### Step 2: Set Up Webhook (After Deployment)
 
-You'll complete this step after deploying to Railway:
+You'll complete this step after deploying to Vercel:
 
 1. Go to **Developers** > **Webhooks**
 2. Click **Add endpoint**
@@ -97,7 +97,7 @@ You'll complete this step after deploying to Railway:
 5. Click **Add endpoint**
 6. Click on your new endpoint
 7. Under **Signing secret**, click **Reveal** and copy the `whsec_...` value
-8. Add this as `STRIPE_WEBHOOK_SECRET` in Railway
+8. Add this as `STRIPE_WEBHOOK_SECRET` in Vercel
 
 ### Step 3: Test Mode vs Live Mode
 
@@ -108,104 +108,79 @@ To switch, toggle **Test mode** in the Stripe Dashboard header.
 
 ---
 
-## Railway Deployment
+## Vercel Deployment
 
-### Step 1: Create Railway Project
+### Step 1: Connect Your GitHub Repository
 
-1. Go to [Railway](https://railway.app)
-2. Click **New Project**
-3. Choose one of:
-   - **Deploy from GitHub repo** (recommended)
-   - **Deploy from CLI**
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+2. Click **Add New...** > **Project**
+3. Import your GitHub repository (`jonwickdev/HillSignal`)
+4. Vercel will automatically detect it's a Next.js application
 
-### Step 2: Deploy from GitHub (Recommended)
+### Step 2: Configure Environment Variables
 
-1. Push your code to a GitHub repository
-2. In Railway, select **Deploy from GitHub repo**
-3. Connect your GitHub account if not already
-4. Select the `hillsignal` repository
-5. Railway will auto-detect it's a Next.js app
+Before deploying, add your environment variables:
 
-### Step 3: Add Environment Variables
+1. In the **Configure Project** section, expand **Environment Variables**
+2. Add each variable:
 
-1. In Railway, click on your service
-2. Go to **Variables** tab
-3. Add each variable from `.env.example`:
+| Key | Value |
+|-----|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://your-project.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` or `pk_live_...` |
+| `STRIPE_SECRET_KEY` | `sk_test_...` or `sk_live_...` |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` (add after webhook setup) |
+| `NEXT_PUBLIC_APP_URL` | `https://hillsignal.com` |
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://oiwuwllrtjiqrpmadqiu.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-NEXT_PUBLIC_APP_URL=https://hillsignal.com
-NODE_ENV=production
-```
+3. Click **Deploy**
 
-4. Click **Deploy** to redeploy with the new variables
+### Step 3: Verify Deployment
 
-### Step 4: Verify Deployment
-
-1. Railway will provide a temporary URL like `hillsignal-production.up.railway.app`
-2. Visit `your-url.railway.app/api/health` - should return `{"status":"healthy"}`
-3. Test the landing page loads correctly
+1. Vercel will build and deploy automatically
+2. Once deployed, you'll get a URL like `hillsignal.vercel.app`
+3. Visit your deployment URL to verify it works
+4. Test the health endpoint: `your-url.vercel.app/api/health`
 
 ---
 
-## Domain Configuration (Namecheap)
+## Domain Configuration
 
-### Step 1: Get Railway's IP/Domain
+### Step 1: Add Custom Domain in Vercel
 
-1. In Railway, go to your service
-2. Click **Settings** > **Networking**
-3. Under **Public Networking**, click **Generate Domain** if you haven't
-4. Note the Railway URL: `hillsignal-production.up.railway.app`
+1. In Vercel Dashboard, select your project
+2. Go to **Settings** > **Domains**
+3. Enter your domain: `hillsignal.com`
+4. Click **Add**
+5. Vercel will show you the required DNS records
 
-### Step 2: Add Custom Domain in Railway
+### Step 2: Configure DNS (Namecheap Example)
 
-1. In **Settings** > **Networking** > **Custom Domain**
-2. Enter `hillsignal.com`
-3. Railway will show you the required DNS records
-
-### Step 3: Configure Namecheap DNS
-
-1. Log in to [Namecheap](https://namecheap.com)
-2. Go to **Domain List** > find `hillsignal.com` > **Manage**
+1. Log in to your domain registrar (e.g., [Namecheap](https://namecheap.com))
+2. Go to **Domain List** > find your domain > **Manage**
 3. Click **Advanced DNS** tab
 4. Delete any existing A, AAAA, or CNAME records for `@` and `www`
-5. Add the following records:
+5. Add the records Vercel provides (typically):
 
-**For root domain (hillsignal.com):**
+**For root domain:**
 | Type | Host | Value | TTL |
 |------|------|-------|-----|
-| CNAME | @ | hillsignal-production.up.railway.app | Automatic |
-
-> ⚠️ If Namecheap doesn't allow CNAME for root (@), use:
-| Type | Host | Value | TTL |
-|------|------|-------|-----|
-| A | @ | [Railway IP from their docs] | Automatic |
+| A | @ | 76.76.21.21 | Automatic |
 
 **For www subdomain:**
 | Type | Host | Value | TTL |
 |------|------|-------|-----|
-| CNAME | www | hillsignal-production.up.railway.app | Automatic |
+| CNAME | www | cname.vercel-dns.com | Automatic |
 
-6. Click the checkmark to save each record
+6. Save your changes
 
-### Step 4: Wait for DNS Propagation
+### Step 3: Verify Domain & SSL
 
-- DNS changes can take 5 minutes to 48 hours to propagate
-- Use [dnschecker.org](https://dnschecker.org) to check status
-- Search for `hillsignal.com` to see if it resolves correctly
-
-### Step 5: SSL Certificate
-
-Railway automatically provisions SSL certificates via Let's Encrypt:
-
-1. After DNS propagation, Railway will auto-generate SSL
-2. Check **Settings** > **Networking** to confirm SSL status
-3. Your site should be accessible at `https://hillsignal.com`
+1. Return to Vercel **Settings** > **Domains**
+2. Wait for domain verification (usually a few minutes)
+3. Vercel automatically provisions SSL certificates
+4. Your site will be live at `https://hillsignal.com`
 
 ---
 
@@ -223,8 +198,9 @@ Now that your site is live:
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
 5. Copy the webhook signing secret (`whsec_...`)
-6. Add to Railway as `STRIPE_WEBHOOK_SECRET`
-7. Redeploy
+6. Add to Vercel: **Settings** > **Environment Variables**
+7. Add `STRIPE_WEBHOOK_SECRET` with the webhook secret value
+8. Redeploy (push a commit or click **Redeploy** in Vercel)
 
 ### Update Supabase Redirect URLs
 
@@ -246,35 +222,41 @@ Now that your site is live:
 
 ## Troubleshooting
 
+### Build Failures
+
+- Check the Vercel deployment logs for specific errors
+- Ensure all environment variables are set correctly
+- Verify `package.json` has correct build scripts
+
 ### "Invalid API Key" Error
-- Double-check your Supabase/Stripe keys in Railway variables
+
+- Double-check your Supabase/Stripe keys in Vercel environment variables
 - Ensure there are no extra spaces or newlines
 - Make sure you're using the correct environment (test vs live)
 
 ### Authentication Not Working
+
 - Check Supabase redirect URLs include your domain
 - Verify Site URL is set correctly in Supabase
 - Check browser console for CORS errors
 
 ### Stripe Checkout Fails
+
 - Verify `STRIPE_SECRET_KEY` is set correctly
 - Check Stripe Dashboard > Logs for error details
 - Ensure `NEXT_PUBLIC_APP_URL` matches your domain
 
 ### Webhook Not Receiving Events
+
 - Verify webhook endpoint URL is correct
 - Check `STRIPE_WEBHOOK_SECRET` matches Stripe Dashboard
 - Look at Stripe Dashboard > Webhooks > [endpoint] > Logs
 
 ### DNS Not Propagating
+
 - Use [dnschecker.org](https://dnschecker.org) to verify
 - Clear browser cache and try incognito mode
-- Try flushing DNS: `sudo dscacheutil -flushcache` (Mac)
-
-### SSL Certificate Issues
-- Ensure DNS is fully propagated first
-- Check Railway Settings > Networking for SSL status
-- SSL usually provisions within 10-15 minutes of DNS setup
+- DNS changes can take 5 minutes to 48 hours to propagate
 
 ---
 
@@ -289,14 +271,26 @@ Now that your site is live:
 | `STRIPE_SECRET_KEY` | Stripe > Developers > API keys | ❌ No |
 | `STRIPE_WEBHOOK_SECRET` | Stripe > Webhooks > [endpoint] | ❌ No |
 | `NEXT_PUBLIC_APP_URL` | Your domain | ✅ Yes |
-| `NODE_ENV` | Set to `production` | ✅ Yes |
+
+---
+
+## Why Vercel?
+
+HillSignal is built with Next.js, and Vercel is the optimal deployment platform because:
+
+- **Zero Configuration**: Next.js apps deploy automatically with no setup
+- **Edge Functions**: API routes run on the edge for low latency
+- **Automatic SSL**: Free SSL certificates for all domains
+- **Preview Deployments**: Every PR gets a unique preview URL
+- **Analytics**: Built-in Web Vitals and analytics
+- **Global CDN**: Content delivered from edge locations worldwide
 
 ---
 
 ## Support
 
 If you encounter issues:
-1. Check Railway logs: Service > Deployments > View Logs
+1. Check Vercel deployment logs: Project > Deployments > View Logs
 2. Check Supabase logs: Database > Logs
 3. Check Stripe logs: Developers > Logs
 4. Email: support@hillsignal.com
