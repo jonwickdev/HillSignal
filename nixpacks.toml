@@ -1,11 +1,16 @@
 # Nixpacks configuration for Railway deployment
-# Ensures Node.js 22 LTS is used for eslint-visitor-keys compatibility
+# Using Node.js 24 for eslint-visitor-keys@5.0.1 compatibility
+# eslint-visitor-keys requires: ^20.19.0 || ^22.13.0 || >=24
 
 [phases.setup]
-nixPkgs = ["nodejs_22", "npm-10_x"]
+nixPkgs = ["nodejs_24", "npm-10_x"]
 
 [phases.build]
-cmds = ["npm ci", "npm run build"]
+cmds = [
+  "npm cache clean --force",
+  "npm ci --prefer-offline",
+  "npm run build"
+]
 
 [start]
 cmd = "npm run start"
