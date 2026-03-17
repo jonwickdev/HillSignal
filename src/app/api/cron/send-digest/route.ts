@@ -56,11 +56,7 @@ async function sendDigest() {
   })
 
   if (eligibleUsers.length === 0) {
-    return NextResponse.json({
-      sent: 0,
-      message: 'No eligible users today',
-      debug: { totalPrefs: allPrefs.length, sample: allPrefs.slice(0, 3).map((p: any) => ({ daily_digest: p.daily_digest, email_frequency: p.email_frequency })) }
-    })
+    return NextResponse.json({ sent: 0, message: 'No eligible users today' })
   }
 
   // Fetch recent signals — last 24h for daily, last 7 days for weekly
