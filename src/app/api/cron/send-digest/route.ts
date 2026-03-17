@@ -98,6 +98,7 @@ async function sendDigest() {
   let sent = 0
   let errors = 0
   const resendKey = process.env.RESEND_API_KEY
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hillsignal.com'
 
   if (!resendKey) {
     console.error('RESEND_API_KEY not configured')
@@ -147,6 +148,10 @@ async function sendDigest() {
           to: [email],
           subject,
           html,
+          headers: {
+            'List-Unsubscribe': `<${appUrl}/profile>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
         }),
       })
 
@@ -171,10 +176,10 @@ async function sendDigest() {
   })
 }
 
-function sentimentEmoji(sentiment: string) {
-  if (sentiment === 'bullish') return '🟢'
-  if (sentiment === 'bearish') return '🔴'
-  return '⚪'
+function sentimentLabel(sentiment: string) {
+  if (sentiment === 'bullish') return '<span style="color:#22c55e;font-weight:600;font-size:12px;">BULLISH</span>'
+  if (sentiment === 'bearish') return '<span style="color:#ef4444;font-weight:600;font-size:12px;">BEARISH</span>'
+  return '<span style="color:#94a3b8;font-weight:600;font-size:12px;">NEUTRAL</span>'
 }
 
 function impactBadge(score: number) {
@@ -191,7 +196,7 @@ function buildDigestEmail(signals: any[], isWeekly: boolean): string {
     <tr>
       <td style="padding:16px 20px;border-bottom:1px solid #1e293b;">
         <div style="margin-bottom:8px;">
-          ${sentimentEmoji(s.sentiment)} ${impactBadge(s.impact_score)}
+          ${sentimentLabel(s.sentiment)} ${impactBadge(s.impact_score)}
           <span style="color:#94a3b8;font-size:12px;margin-left:8px;text-transform:uppercase;">${s.event_type?.replace('_', ' ')}</span>
         </div>
         <a href="${appUrl}/signals/${s.id}" style="color:#e2e8f0;font-size:16px;font-weight:600;text-decoration:none;line-height:1.4;">
@@ -216,7 +221,7 @@ function buildDigestEmail(signals: any[], isWeekly: boolean): string {
         <!-- Header -->
         <tr>
           <td style="padding:32px 24px;text-align:center;border-bottom:1px solid #1e293b;">
-            <div style="font-size:28px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">📊 HillSignal</div>
+            <div style="font-size:28px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">HillSignal</div>
             <div style="color:#60a5fa;font-size:14px;margin-top:8px;font-weight:500;">${isWeekly ? 'Weekly' : 'Daily'} Market Intelligence Digest</div>
           </td>
         </tr>
