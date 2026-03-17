@@ -28,6 +28,18 @@ export async function GET(request: Request) {
   }
 
   const type = url.searchParams.get('type') ?? 'bills'
+  const reset = url.searchParams.get('reset') === 'true'
+
+  // Reset cursor if requested — allows re-running backfill to fill gaps
+  if (reset) {
+    const adminClient = createAdminClient()
+    const stateId = type === 'contracts' ? 'backfill_contracts' : 'backfill_bills'
+    await adminClient.from('poll_state').delete().eq('id', stateId)
+    return NextResponse.json({
+      status: 'reset',
+      message: `Backfill cursor for ${type} has been reset. Run again without &reset=true to start fresh.`,
+    })
+  }
   if (type === 'contracts') {
     return backfillContracts()
   }
