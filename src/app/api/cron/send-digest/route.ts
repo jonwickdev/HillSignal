@@ -48,14 +48,19 @@ async function sendDigest() {
   const eligibleUsers = allPrefs.filter((p: any) => {
     // Must have daily_digest enabled
     if (!p.daily_digest) return false
-    // Daily users always get it; weekly users only on Monday
-    if (p.email_frequency === 'daily') return true
-    if (p.email_frequency === 'weekly' && isMonday) return true
-    return false
+    // If daily_digest is on, send daily by default
+    // Weekly users only get it on Monday
+    if (p.email_frequency === 'weekly') return isMonday
+    // All other frequencies (daily, instant, or any) get the daily digest
+    return true
   })
 
   if (eligibleUsers.length === 0) {
-    return NextResponse.json({ sent: 0, message: 'No eligible users today' })
+    return NextResponse.json({
+      sent: 0,
+      message: 'No eligible users today',
+      debug: { totalPrefs: allPrefs.length, sample: allPrefs.slice(0, 3).map((p: any) => ({ daily_digest: p.daily_digest, email_frequency: p.email_frequency })) }
+    })
   }
 
   // Fetch recent signals — last 24h for daily, last 7 days for weekly
