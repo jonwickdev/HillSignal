@@ -73,10 +73,10 @@ async function backfillBills() {
     })
   }
 
-  // Fetch window: cursor - 7 days to cursor
+  // Fetch window: cursor - 3 days to cursor (smaller windows to stay under Vercel 60s limit)
   // Congress.gov requires format: YYYY-MM-DDTHH:MM:SSZ (no milliseconds)
   const fmtDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
-  const windowStart = new Date(cursor.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const windowStart = new Date(cursor.getTime() - 3 * 24 * 60 * 60 * 1000)
   const fromDateTime = fmtDate(windowStart < ninetyDaysAgo ? ninetyDaysAgo : windowStart)
   const toDateTime = fmtDate(cursor)
 
@@ -84,7 +84,7 @@ async function backfillBills() {
 
   try {
     // 1. Fetch bills for this window (pass toDateTime to avoid overlap)
-    const rawItems = await fetchRecentBills(fromDateTime, 250, toDateTime)
+    const rawItems = await fetchRecentBills(fromDateTime, 100, toDateTime)
     console.log(`[backfill] Fetched ${rawItems.length} bills`)
 
     let stored = 0
@@ -107,13 +107,13 @@ async function backfillBills() {
         console.log(`[backfill] ${relevant.length} passed market-relevance filter`)
 
         if (relevant.length > 0) {
-          // 4. Enrich bills
-          const enriched = await enrichBillItems(relevant)
+          // 4. Only enrich the subset we'll analyze (enriching all 100+ burns too much time)
+          const toEnrich = relevant.slice(0, 8)
+          const enriched = await enrichBillItems(toEnrich)
 
-          // 5. Analyze (max 15 per call to stay within 60s)
-          const toAnalyze = enriched.slice(0, 15)
-          console.log(`[backfill] Analyzing ${toAnalyze.length} items...`)
-          const results = await analyzeBatch(toAnalyze, 3)
+          // 5. Analyze (max 8 per call to stay within Vercel 60s limit)
+          console.log(`[backfill] Analyzing ${enriched.length} items...`)
+          const results = await analyzeBatch(enriched, 3)
           analyzed = results.length
 
           // 6. Quality gate + store
@@ -148,7 +148,7 @@ async function backfillBills() {
       }
     }
 
-    // 7. Move cursor backward by 7 days
+    // 7. Move cursor backward
     const newCursor = windowStart < ninetyDaysAgo ? ninetyDaysAgo : windowStart
     const totalProcessed = (backfillState?.bills_processed ?? 0) + rawItems.length
     const totalStored = (backfillState?.votes_processed ?? 0) + stored
@@ -174,7 +174,7 @@ async function backfillBills() {
       elapsed_ms: elapsed,
       message: isComplete
         ? `Bill backfill complete. ${totalStored} signals stored from ${totalProcessed} bills.`
-        : `Processed 7-day window. ~${daysRemaining} days remaining. Call again to continue.`,
+        : `Processed 3-day window. ~${daysRemaining} days remaining. Call again to continue.`,
     })
   } catch (error: any) {
     console.error('[backfill] Error:', error)
