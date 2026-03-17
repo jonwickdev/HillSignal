@@ -109,16 +109,19 @@ async function backfillBills() {
         console.log(`[backfill] ${relevant.length} passed market-relevance filter`)
 
         if (relevant.length > 0) {
-          // 4. Skip enrichment for backfill — list data (title, policy area, latest action)
-          //    is enough for solid analysis. Enrichment adds sponsor detail but costs
-          //    1 HTTP call per bill and was the main cause of timeouts.
-          // 5. Analyze up to 20 at concurrency 5 (~40s for 20 bills)
+          // STRATEGY: Store ALL relevant bills. Deep AI analysis for top 20,
+          // basic metadata records for the rest. This builds a comprehensive
+          // database for "follow the money" analysis later.
+
+          const analyzedIds = new Set<string>()
+
+          // 4a. Deep analysis for top 20 (no enrichment — list data is sufficient)
           const toAnalyze = relevant.slice(0, 20)
-          console.log(`[backfill] Analyzing ${toAnalyze.length} of ${relevant.length} relevant items (no enrichment)...`)
+          console.log(`[backfill] Deep-analyzing ${toAnalyze.length} of ${relevant.length} relevant items...`)
           const results = await analyzeBatch(toAnalyze, 5)
           analyzed = results.length
 
-          // 6. Quality gate + store
+          // Store deep-analyzed signals (with quality gate)
           const quality = results.filter((s: any) => {
             const score = s?.impact_score ?? 0
             const sectors = s?.affected_sectors ?? []
@@ -144,7 +147,51 @@ async function backfillBills() {
               key_takeaways: signal?.key_takeaways ?? [],
               market_implications: signal?.market_implications ?? null,
             })
-            if (!insertError) stored++
+            if (!insertError) {
+              stored++
+              if (signal?.congress_gov_id) analyzedIds.add(signal.congress_gov_id)
+            }
+          }
+
+          // 4b. Bulk-store remaining relevant bills as basic records (no AI call needed)
+          // These have title, policy area, source URL, and bill number from Congress.gov
+          const remaining = relevant.filter(item => !analyzedIds.has(item.congress_gov_id))
+          if (remaining.length > 0) {
+            const basicRows = remaining.map(item => {
+              const policyArea = item?.raw?.policyArea?.name ?? null
+              return {
+                event_type: 'bill',
+                title: item?.title ?? 'Untitled',
+                summary: item?.description ?? '',
+                full_analysis: null,
+                impact_score: 3,
+                sentiment: 'neutral',
+                affected_sectors: policyArea ? [policyArea] : [],
+                tickers: [],
+                source_url: item?.source_url ?? null,
+                congress_gov_id: item?.congress_gov_id ?? null,
+                bill_number: item?.bill_number ?? null,
+                committee: item?.committee ?? null,
+                legislators: item?.legislators ?? [],
+                event_date: item?.date ?? new Date().toISOString(),
+                key_takeaways: [],
+                market_implications: null,
+              }
+            })
+            // Insert in chunks of 50 to stay under Supabase payload limits
+            let basicStored = 0
+            for (let i = 0; i < basicRows.length; i += 50) {
+              const chunk = basicRows.slice(i, i + 50)
+              const { error: bulkErr, data: bulkData } = await adminClient
+                .from('signals')
+                .insert(chunk)
+                .select('id')
+              if (!bulkErr) basicStored += (bulkData?.length ?? chunk.length)
+            }
+            stored += basicStored
+            console.log(`[backfill] Stored ${quality.length} deep-analyzed + ${basicStored} basic records = ${stored} total`)
+          } else {
+            console.log(`[backfill] Stored ${quality.length} deep-analyzed signals (all relevant were analyzed)`)
           }
         }
       }
@@ -170,7 +217,7 @@ async function backfillBills() {
     return NextResponse.json({
       status: isComplete ? 'complete' : 'in_progress',
       window: { from: fromDateTime, to: toDateTime },
-      batch: { fetched: rawItems.length, relevant: relevantCount, analyzed, stored },
+      batch: { fetched: rawItems.length, relevant: relevantCount, deep_analyzed: analyzed, stored_total: stored },
       totals: { processed: totalProcessed, stored: totalStored },
       days_remaining: daysRemaining,
       elapsed_ms: elapsed,
