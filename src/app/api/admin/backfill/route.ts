@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
-import { fetchRecentBills, enrichBillItems } from '@/lib/congress-api'
+import { fetchRecentBills } from '@/lib/congress-api'
 import { fetchRecentContracts, fetchSectorContracts, SECTOR_NAICS_MAP } from '@/lib/usaspending-api'
 import { analyzeBatch, filterForMarketRelevance, analyzeContractItem, filterContractsForRelevance } from '@/lib/gemini-analysis'
 import type { RawContractItem } from '@/lib/gemini-analysis'
@@ -73,10 +73,10 @@ async function backfillBills() {
     })
   }
 
-  // Fetch window: cursor - 3 days to cursor (smaller windows to stay under Vercel 60s limit)
+  // Fetch window: cursor - 7 days to cursor
   // Congress.gov requires format: YYYY-MM-DDTHH:MM:SSZ (no milliseconds)
   const fmtDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
-  const windowStart = new Date(cursor.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const windowStart = new Date(cursor.getTime() - 7 * 24 * 60 * 60 * 1000)
   const fromDateTime = fmtDate(windowStart < ninetyDaysAgo ? ninetyDaysAgo : windowStart)
   const toDateTime = fmtDate(cursor)
 
@@ -84,11 +84,12 @@ async function backfillBills() {
 
   try {
     // 1. Fetch bills for this window (pass toDateTime to avoid overlap)
-    const rawItems = await fetchRecentBills(fromDateTime, 100, toDateTime)
+    const rawItems = await fetchRecentBills(fromDateTime, 250, toDateTime)
     console.log(`[backfill] Fetched ${rawItems.length} bills`)
 
     let stored = 0
     let analyzed = 0
+    let relevantCount = 0
 
     if (rawItems.length > 0) {
       // 2. Dedup against existing DB
@@ -104,16 +105,17 @@ async function backfillBills() {
       if (newItems.length > 0) {
         // 3. Filter for market relevance
         const relevant = await filterForMarketRelevance(newItems)
+        relevantCount = relevant.length
         console.log(`[backfill] ${relevant.length} passed market-relevance filter`)
 
         if (relevant.length > 0) {
-          // 4. Only enrich the subset we'll analyze (enriching all 100+ burns too much time)
-          const toEnrich = relevant.slice(0, 8)
-          const enriched = await enrichBillItems(toEnrich)
-
-          // 5. Analyze (max 8 per call to stay within Vercel 60s limit)
-          console.log(`[backfill] Analyzing ${enriched.length} items...`)
-          const results = await analyzeBatch(enriched, 3)
+          // 4. Skip enrichment for backfill — list data (title, policy area, latest action)
+          //    is enough for solid analysis. Enrichment adds sponsor detail but costs
+          //    1 HTTP call per bill and was the main cause of timeouts.
+          // 5. Analyze up to 20 at concurrency 5 (~40s for 20 bills)
+          const toAnalyze = relevant.slice(0, 20)
+          console.log(`[backfill] Analyzing ${toAnalyze.length} of ${relevant.length} relevant items (no enrichment)...`)
+          const results = await analyzeBatch(toAnalyze, 5)
           analyzed = results.length
 
           // 6. Quality gate + store
@@ -168,13 +170,13 @@ async function backfillBills() {
     return NextResponse.json({
       status: isComplete ? 'complete' : 'in_progress',
       window: { from: fromDateTime, to: toDateTime },
-      batch: { fetched: rawItems.length, analyzed, stored },
+      batch: { fetched: rawItems.length, relevant: relevantCount, analyzed, stored },
       totals: { processed: totalProcessed, stored: totalStored },
       days_remaining: daysRemaining,
       elapsed_ms: elapsed,
       message: isComplete
         ? `Bill backfill complete. ${totalStored} signals stored from ${totalProcessed} bills.`
-        : `Processed 3-day window. ~${daysRemaining} days remaining. Call again to continue.`,
+        : `Processed 7-day window. ~${daysRemaining} days remaining. Call again to continue.`,
     })
   } catch (error: any) {
     console.error('[backfill] Error:', error)
