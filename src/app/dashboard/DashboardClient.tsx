@@ -18,6 +18,19 @@ const sentimentConfig: Record<string, { color: string; bg: string; border: strin
 
 const PAGE_SIZE = 20
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  bill: 'Bill',
+  vote: 'Vote',
+  hearing: 'Hearing',
+  floor_action: 'Floor Action',
+  contract_award: 'Contract Award',
+  committee_action: 'Committee Action',
+}
+
+function formatEventType(type: string): string {
+  return EVENT_TYPE_LABELS[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 interface DashboardClientProps {
   userEmail: string
   preferences: any
@@ -48,19 +61,23 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
 
+  // Sentiment & type filters
+  const [selectedSentiment, setSelectedSentiment] = useState<string>('all')
+  const [selectedType, setSelectedType] = useState<string>('all')
+
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Re-fetch when search changes
+  // Re-fetch when search or filters change
   useEffect(() => {
     if (!loading) {
       fetchSignals(false, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch])
+  }, [debouncedSearch, selectedSentiment, selectedType])
 
   // Extra signals fetched by ID (favorites beyond 90-day window)
   const [extraSignals, setExtraSignals] = useState<Signal[]>([])
@@ -93,6 +110,8 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       const params = new URLSearchParams()
       if (refresh) { params.set('refresh', 'true'); params.set('force', 'true') }
       if (debouncedSearch) params.set('search', debouncedSearch)
+      if (selectedSentiment !== 'all') params.set('sentiment', selectedSentiment)
+      if (selectedType !== 'all') params.set('event_type', selectedType)
       params.set('limit', String(PAGE_SIZE))
 
       const res = await fetch(`/api/signals?${params.toString()}`)
@@ -109,7 +128,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       setRefreshing(false)
       setPolling(false)
     }
-  }, [debouncedSearch])
+  }, [debouncedSearch, selectedSentiment, selectedType])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
@@ -120,6 +139,8 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       params.set('limit', String(PAGE_SIZE))
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (selectedSector !== 'all') params.set('sector', selectedSector)
+      if (selectedSentiment !== 'all') params.set('sentiment', selectedSentiment)
+      if (selectedType !== 'all') params.set('event_type', selectedType)
 
       const res = await fetch(`/api/signals?${params.toString()}`)
       const data = await res?.json?.()
@@ -132,7 +153,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, hasMore, signals.length, debouncedSearch, selectedSector])
+  }, [loadingMore, hasMore, signals.length, debouncedSearch, selectedSector, selectedSentiment, selectedType])
 
   // Toggle favorite/dismiss
   const toggleAction = useCallback(async (signalId: string, action: 'favorite' | 'dismissed') => {
@@ -260,6 +281,11 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
   )?.sort?.()
   const sectors = ['all', ...(allSectors ?? [])]
 
+  // Derive unique event types from loaded signals
+  const eventTypes = Array.from(
+    new Set((signals ?? [])?.map?.((s: Signal) => s?.event_type)?.filter?.(Boolean))
+  )?.sort?.() ?? []
+
   return (
     <div className="min-h-screen bg-hill-black">
       {/* Header */}
@@ -316,32 +342,115 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           )}
         </div>
 
-        {/* Sector filter + favorites toggle */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="overflow-x-auto flex-1">
-            <div className="flex gap-2 pb-2">
-              {(sectors ?? [])?.map?.((sector: string) => (
-                <button key={sector} onClick={() => setSelectedSector(sector)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                    selectedSector === sector
-                      ? 'bg-hill-orange text-white'
+        {/* Filters */}
+        <div className="mb-6 space-y-3">
+          {/* Row 1: Sentiment + Type + Favorites */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Sentiment pills */}
+            {(['all', 'bullish', 'bearish', 'neutral'] as const).map((s) => {
+              const conf = s !== 'all' ? sentimentConfig[s] : null
+              const isActive = selectedSentiment === s
+              return (
+                <button key={s} onClick={() => setSelectedSentiment(s)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+                    isActive
+                      ? s === 'all' ? 'bg-hill-orange text-white' : `${conf?.bg ?? ''} ${conf?.color ?? ''} border ${conf?.border ?? ''}`
                       : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
                   }`}>
-                  {sector === 'all' ? 'All Sectors' : sector}
+                  {conf && <conf.Icon size={13} />}
+                  {s === 'all' ? 'All Sentiment' : conf?.label ?? s}
                 </button>
-              ))}
-            </div>
+              )
+            })}
+
+            <span className="w-px h-6 bg-hill-border hidden sm:block" />
+
+            {/* Type pills */}
+            {(['all', ...eventTypes] as const).map((t) => (
+              <button key={t} onClick={() => setSelectedType(t)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                  selectedType === t
+                    ? 'bg-hill-orange text-white'
+                    : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+                }`}>
+                {t === 'all' ? 'All Types' : formatEventType(t)}
+              </button>
+            ))}
+
+            <span className="w-px h-6 bg-hill-border hidden sm:block" />
+
+            {/* Favorites toggle */}
+            <button
+              onClick={() => setShowFavoritesOnly(prev => !prev)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                showFavoritesOnly
+                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+                  : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+              }`}>
+              <Star size={14} className={showFavoritesOnly ? 'fill-yellow-400' : ''} />
+              {showFavoritesOnly ? 'Showing Favorites' : 'Favorites'}
+            </button>
           </div>
-          <button
-            onClick={() => setShowFavoritesOnly(prev => !prev)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-              showFavoritesOnly
-                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
-                : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
-            }`}>
-            <Star size={14} className={showFavoritesOnly ? 'fill-yellow-400' : ''} />
-            {showFavoritesOnly ? 'Showing Favorites' : 'Favorites'}
-          </button>
+
+          {/* Row 2: Sector pills */}
+          {(allSectors?.length ?? 0) > 0 && (
+            <div className="overflow-x-auto">
+              <div className="flex gap-2 pb-1">
+                {(sectors ?? [])?.map?.((sector: string) => (
+                  <button key={sector} onClick={() => setSelectedSector(sector)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                      selectedSector === sector
+                        ? 'bg-hill-orange text-white'
+                        : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+                    }`}>
+                    {sector === 'all' ? 'All Sectors' : sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active filter summary */}
+          {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch) && (
+            <div className="flex items-center gap-2 text-xs text-hill-muted">
+              <span>Active filters:</span>
+              {selectedSentiment !== 'all' && (
+                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
+                  {sentimentConfig[selectedSentiment]?.label ?? selectedSentiment}
+                  <button onClick={() => setSelectedSentiment('all')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
+                </span>
+              )}
+              {selectedType !== 'all' && (
+                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
+                  {formatEventType(selectedType)}
+                  <button onClick={() => setSelectedType('all')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
+                </span>
+              )}
+              {selectedSector !== 'all' && (
+                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
+                  {selectedSector}
+                  <button onClick={() => setSelectedSector('all')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
+                </span>
+              )}
+              {showFavoritesOnly && (
+                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
+                  Favorites only
+                  <button onClick={() => setShowFavoritesOnly(false)} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
+                </span>
+              )}
+              {debouncedSearch && (
+                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
+                  &ldquo;{debouncedSearch}&rdquo;
+                  <button onClick={() => setSearchQuery('')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
+                </span>
+              )}
+              <button
+                onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery('') }}
+                className="text-hill-orange hover:text-hill-orange/80 ml-1">
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Polling banner */}
@@ -396,7 +505,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 text-xs text-hill-muted font-mono mb-2">
-                          <span className="uppercase px-2 py-0.5 bg-hill-gray rounded">{signal?.event_type ?? 'signal'}</span>
+                          <span className="px-2 py-0.5 bg-hill-gray rounded">{formatEventType(signal?.event_type ?? 'signal')}</span>
                           {signal?.committee && <span>{signal.committee}</span>}
                           <span>&bull;</span>
                           <span>{signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
@@ -556,46 +665,45 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           <Card className="text-center py-12">
             <p className="text-hill-muted mb-2">
               {showFavoritesOnly ? 'No favorited signals yet. Star signals you want to track.' :
-               (signals?.length ?? 0) === 0 ? 'No signals yet. Trigger a refresh to poll Congress.gov.' :
+               (signals?.length ?? 0) === 0 && selectedSentiment === 'all' && selectedType === 'all' && !debouncedSearch ? 'No signals yet. Trigger a refresh to poll Congress.gov.' :
                debouncedSearch ? `No signals matching "${debouncedSearch}".` :
+               selectedSentiment !== 'all' || selectedType !== 'all' ? `No signals match the current filters.` :
                'No signals found for this sector.'}
             </p>
             <div className="flex justify-center gap-4 mt-4">
-              {(signals?.length ?? 0) === 0 && (
+              {(signals?.length ?? 0) === 0 && selectedSentiment === 'all' && selectedType === 'all' && !debouncedSearch && (
                 <Button onClick={() => fetchSignals(true, true)} loading={refreshing}>Poll Congress.gov</Button>
               )}
-              {showFavoritesOnly && (
-                <Button variant="ghost" onClick={() => setShowFavoritesOnly(false)}>Show All Signals</Button>
-              )}
-              {selectedSector !== 'all' && (
-                <Button variant="ghost" onClick={() => setSelectedSector('all')}>View all sectors</Button>
-              )}
-              {debouncedSearch && (
-                <Button variant="ghost" onClick={() => setSearchQuery('')}>Clear Search</Button>
+              {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch) && (
+                <Button variant="ghost" onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery('') }}>Clear All Filters</Button>
               )}
             </div>
           </Card>
         )}
 
-        {/* Stats */}
+        {/* Stats — clickable to filter */}
         {!loading && (signals?.length ?? 0) > 0 && (
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-hill-dark rounded-lg p-4 border border-hill-border">
+            <button onClick={() => { setSelectedSentiment('all'); setShowFavoritesOnly(false) }}
+              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all ${selectedSentiment === 'all' && !showFavoritesOnly ? 'border-hill-orange ring-1 ring-hill-orange/30' : 'border-hill-border hover:border-hill-border/80'}`}>
               <p className="text-hill-muted text-xs mb-1">Total Signals</p>
               <p className="text-2xl font-bold text-hill-white font-mono">{signals?.length ?? 0}</p>
-            </div>
-            <div className="bg-hill-dark rounded-lg p-4 border border-hill-border">
+            </button>
+            <button onClick={() => { setSelectedSentiment('bullish'); setShowFavoritesOnly(false) }}
+              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all ${selectedSentiment === 'bullish' ? 'border-hill-green ring-1 ring-hill-green/30' : 'border-hill-border hover:border-hill-border/80'}`}>
               <p className="text-hill-muted text-xs mb-1">Bullish</p>
               <p className="text-2xl font-bold text-hill-green font-mono">{(signals ?? [])?.filter?.((s: Signal) => s?.sentiment === 'bullish')?.length ?? 0}</p>
-            </div>
-            <div className="bg-hill-dark rounded-lg p-4 border border-hill-border">
+            </button>
+            <button onClick={() => { setSelectedSentiment('bearish'); setShowFavoritesOnly(false) }}
+              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all ${selectedSentiment === 'bearish' ? 'border-hill-red ring-1 ring-hill-red/30' : 'border-hill-border hover:border-hill-border/80'}`}>
               <p className="text-hill-muted text-xs mb-1">Bearish</p>
               <p className="text-2xl font-bold text-hill-red font-mono">{(signals ?? [])?.filter?.((s: Signal) => s?.sentiment === 'bearish')?.length ?? 0}</p>
-            </div>
-            <div className="bg-hill-dark rounded-lg p-4 border border-hill-border">
+            </button>
+            <button onClick={() => { setShowFavoritesOnly(true); setSelectedSentiment('all') }}
+              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all ${showFavoritesOnly ? 'border-yellow-500 ring-1 ring-yellow-500/30' : 'border-hill-border hover:border-hill-border/80'}`}>
               <p className="text-hill-muted text-xs mb-1">Favorites</p>
               <p className="text-2xl font-bold text-yellow-400 font-mono">{favorites.size}</p>
-            </div>
+            </button>
           </div>
         )}
       </main>

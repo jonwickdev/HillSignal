@@ -171,9 +171,21 @@ export async function GET(request: Request) {
       query = query.contains('affected_sectors', [sector])
     }
 
-    // Server-side text search (title, tickers via ilike)
+    // Sentiment filter
+    const sentiment = searchParams?.get?.('sentiment')
+    if (sentiment && sentiment !== 'all') {
+      query = query.eq('sentiment', sentiment)
+    }
+
+    // Event type filter
+    const eventType = searchParams?.get?.('event_type')
+    if (eventType && eventType !== 'all') {
+      query = query.eq('event_type', eventType)
+    }
+
+    // Server-side text search (title, summary, and tickers array cast to text)
     if (search) {
-      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%`)
+      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,tickers::text.ilike.%${search}%`)
     }
 
     const { data, error } = await query
