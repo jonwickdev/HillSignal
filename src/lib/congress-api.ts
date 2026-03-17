@@ -107,7 +107,7 @@ async function fetchWithRetry(url: string, retries: number = 2): Promise<any> {
   }
 }
 
-export async function fetchRecentBills(fromDateTime?: string, limit: number = 20): Promise<RawCongressItem[]> {
+export async function fetchRecentBills(fromDateTime?: string, limit: number = 20, toDateTime?: string): Promise<RawCongressItem[]> {
   const apiKey = getApiKey()
   if (!apiKey) throw new Error('CONGRESS_API_KEY not configured')
 
@@ -115,7 +115,10 @@ export async function fetchRecentBills(fromDateTime?: string, limit: number = 20
   const fetchLimit = Math.min(limit, 250)
   let url = `${BASE_URL}/bill?api_key=${apiKey}&format=json&sort=updateDate+desc&limit=${fetchLimit}`
   if (fromDateTime) {
-    url += `&fromDateTime=${fromDateTime}`
+    url += `&fromDateTime=${encodeURIComponent(fromDateTime)}`
+  }
+  if (toDateTime) {
+    url += `&toDateTime=${encodeURIComponent(toDateTime)}`
   }
 
   console.log(`[congress] Fetching up to ${fetchLimit} bills...`)

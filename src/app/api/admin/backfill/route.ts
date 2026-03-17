@@ -74,17 +74,17 @@ async function backfillBills() {
   }
 
   // Fetch window: cursor - 7 days to cursor
+  // Congress.gov requires format: YYYY-MM-DDTHH:MM:SSZ (no milliseconds)
+  const fmtDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
   const windowStart = new Date(cursor.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const fromDateTime = windowStart < ninetyDaysAgo
-    ? ninetyDaysAgo.toISOString().replace('Z', '+00:00')
-    : windowStart.toISOString().replace('Z', '+00:00')
-  const toDateTime = cursor.toISOString().replace('Z', '+00:00')
+  const fromDateTime = fmtDate(windowStart < ninetyDaysAgo ? ninetyDaysAgo : windowStart)
+  const toDateTime = fmtDate(cursor)
 
   console.log(`[backfill] Bills window: ${fromDateTime} → ${toDateTime}`)
 
   try {
-    // 1. Fetch bills for this window
-    const rawItems = await fetchRecentBills(fromDateTime, 250)
+    // 1. Fetch bills for this window (pass toDateTime to avoid overlap)
+    const rawItems = await fetchRecentBills(fromDateTime, 250, toDateTime)
     console.log(`[backfill] Fetched ${rawItems.length} bills`)
 
     let stored = 0
