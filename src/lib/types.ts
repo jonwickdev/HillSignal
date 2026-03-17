@@ -37,7 +37,7 @@ export interface Purchase {
 
 export interface Signal {
   id: string
-  event_type: 'bill' | 'hearing' | 'vote' | 'amendment' | 'committee_action' | 'floor_action'
+  event_type: 'bill' | 'hearing' | 'vote' | 'amendment' | 'committee_action' | 'floor_action' | 'contract_award'
   title: string
   summary: string
   full_analysis: string | null

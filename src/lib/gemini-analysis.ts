@@ -1,14 +1,27 @@
 /**
- * Gemini AI Analysis Engine
- * Supports both direct Google Gemini API (GEMINI_API_KEY) 
- * and Abacus AI RouteLLM proxy (ABACUSAI_API_KEY)
+ * AI Analysis Engine — RouteLLM via Abacus AI
+ * Powers bill analysis and contract award analysis for HillSignal.
  */
 
 import type { Signal } from '@/lib/types'
 import type { RawCongressItem } from '@/lib/congress-api'
 
-const ANALYSIS_PROMPT = `You are a non-partisan Congressional market intelligence analyst for retail investors.
-Analyze this Congressional event and provide market-relevant analysis.
+export interface RawContractItem {
+  award_id: string
+  recipient_name: string
+  description: string
+  award_amount: number
+  awarding_agency: string
+  awarding_sub_agency: string
+  contract_type: string
+  naics_code: string | null
+  start_date: string
+  end_date: string | null
+  source_url: string
+  generated_internal_id: string
+}
+
+const ANALYSIS_PROMPT = `You are a non-partisan Congressional market intelligence analyst writing for retail investors. Your job is to deliver direct, actionable analysis. No hedging. No "could potentially" or "may somewhat" or "remains to be seen." State what IS happening, what HAS happened historically, and what specific companies stand to gain or lose.
 
 CONGRESSIONAL EVENT:
 Type: {type}
@@ -18,6 +31,16 @@ Date: {date}
 Bill Number: {bill_number}
 Committee: {committee}
 Legislators: {legislators}
+{enrichment_block}
+
+ANALYSIS RULES — FOLLOW EXACTLY:
+1. NO HEDGING. Never write "could potentially", "may impact", "might affect", "remains to be seen", "it is worth noting." State facts and draw direct conclusions.
+2. NAME SPECIFIC COMPANIES AND TICKERS. Do not say "defense contractors" — say "Lockheed Martin ($LMT), RTX Corp ($RTX), Northrop Grumman ($NOC)." Do not say "tech companies" — name the actual companies affected.
+3. CITE HISTORICAL PRECEDENT. When a similar bill or action happened before, state the year, what happened, and what the market did. Example: "When the CHIPS Act passed in July 2022, $INTC surged 8% in a week and $TSM gained 4%."
+4. BE SPECIFIC ABOUT DOLLAR AMOUNTS. If the bill appropriates money, state the amount. If a sector's TAM changes, estimate by how much.
+5. EXPLAIN THE MONEY TRAIL. Where does funding go? Which companies are positioned to receive contracts? What is the mechanism (grants, tax credits, direct procurement)?
+6. NON-PARTISAN. No political commentary. Focus only on money, markets, and corporate impact.
+7. If enrichment data includes sponsors, use that to assess legislative momentum (committee chairs sponsoring = high momentum; junior members = lower).
 
 Provide analysis in the following JSON format:
 {
@@ -25,20 +48,56 @@ Provide analysis in the following JSON format:
   "impact_score": <1-10 integer>,
   "affected_sectors": ["sector1", "sector2"],
   "tickers": ["$TICK1", "$TICK2"],
-  "summary": "<2-3 sentence market-focused summary>",
-  "full_analysis": "<Detailed 3-5 paragraph analysis covering: 1) What happened 2) Market implications 3) Which sectors/companies are affected and why 4) Historical context or precedent 5) Timeline and next steps>",
+  "summary": "<2-3 sentence direct market summary. No hedging.>",
+  "full_analysis": "<3-5 paragraphs: 1) What is happening and why it matters RIGHT NOW. 2) The money trail — where funding flows, which companies are positioned to capture it. 3) Historical precedent — what happened last time similar legislation moved, with dates and price action. 4) Specific winners and losers with ticker symbols. 5) Timeline — what happens next and when.>",
   "key_takeaways": ["takeaway1", "takeaway2", "takeaway3"],
-  "market_implications": "<1-2 paragraph focused market outlook>",
-  "impact_factors": "<Brief explanation of why this impact score was given, considering: legislative momentum, market size affected, timeline proximity, historical precedent>"
+  "market_implications": "<1-2 paragraphs. Direct. Name tickers. State direction.>",
+  "impact_factors": "<Why this impact score. Reference: legislative stage, dollar amount, sponsor seniority, sector size, historical precedent.>"
 }
 
-Rules:
-- Be strictly factual and non-partisan
-- Focus on market and investment implications only
-- Use standard sector names: Healthcare, Technology, Energy, Finance, Defense, Agriculture, Manufacturing, Infrastructure, Telecommunications, Transportation, Real Estate, Consumer
-- Include specific ticker symbols when companies are clearly affected
-- Impact score criteria: 1-3 minimal market impact, 4-6 moderate sector impact, 7-8 significant market mover, 9-10 major market event
-- Do NOT include political opinions or partisan commentary
+Standard sector names: Healthcare, Technology, Energy, Finance, Defense, Agriculture, Manufacturing, Infrastructure, Telecommunications, Transportation, Real Estate, Consumer
+
+Impact scoring: 1-3 = procedural with no near-term market impact. 4-6 = moves a specific sector measurably. 7-8 = significant for multiple sectors or a major single-sector shift. 9-10 = market-wide event (omnibus spending, debt ceiling, major regulation).
+
+Respond with raw JSON only. No markdown, no code blocks.`
+
+const CONTRACT_ANALYSIS_PROMPT = `You are a non-partisan federal contract intelligence analyst writing for retail investors. You analyze USAspending.gov contract awards and connect them to publicly traded companies and their stock performance.
+
+CONTRACT AWARD:
+Recipient: {recipient}
+Award Amount: ${'{amount}'}
+Awarding Agency: {agency}
+Sub-Agency: {sub_agency}
+Description: {description}
+Contract Type: {contract_type}
+NAICS Code: {naics}
+Period: {start_date} to {end_date}
+
+{bill_context}
+
+ANALYSIS RULES — FOLLOW EXACTLY:
+1. NO HEDGING. State direct conclusions about who benefits and by how much.
+2. IDENTIFY THE PUBLIC COMPANY. If the recipient is a subsidiary, name the parent company and ticker. If the recipient is private, name publicly traded competitors or supply chain partners that benefit.
+3. REVENUE IMPACT. Calculate what this contract means as a percentage of the company's annual revenue. A $500M contract to a company with $60B revenue is ~0.8% — meaningful but not transformative. A $500M contract to a $5B company is 10% — a major catalyst.
+4. CONNECT TO LEGISLATION. If related bill signals exist, explicitly connect: "This $2.1B award to Raytheon follows directly from the FY2026 NDAA's $886B defense topline, which passed in December."
+5. HISTORICAL PATTERN. Reference past contract award → stock price patterns for this company or sector.
+6. SUPPLY CHAIN. Name 2-3 subcontractors or suppliers that benefit downstream. These are often smaller-cap companies with outsized price moves.
+7. NAME SPECIFIC TICKERS throughout the analysis.
+
+Provide analysis in the following JSON format:
+{
+  "sentiment": "bullish" | "bearish" | "neutral",
+  "impact_score": <1-10 integer>,
+  "affected_sectors": ["sector1", "sector2"],
+  "tickers": ["$TICK1", "$TICK2"],
+  "summary": "<2-3 sentence direct summary connecting the contract to market impact.>",
+  "full_analysis": "<3-5 paragraphs: 1) The contract — who got it, how much, for what. 2) The parent company or publicly traded beneficiary and revenue impact. 3) Connection to legislation — which bill authorized this spending. 4) Supply chain winners — subcontractors and suppliers with tickers. 5) Historical pattern — what happened after similar awards.>",
+  "key_takeaways": ["takeaway1", "takeaway2", "takeaway3"],
+  "market_implications": "<1-2 paragraphs. Direct. Name tickers. Quantify where possible.>",
+  "impact_factors": "<Why this score. Reference: contract size relative to company revenue, sector momentum, legislative backing, supply chain breadth.>"
+}
+
+Impact scoring: 1-3 = routine renewal or small contract. 4-6 = meaningful new business for a public company. 7-8 = large contract shifting competitive dynamics. 9-10 = historic-scale award reshaping a sector.
 
 Respond with raw JSON only. No markdown, no code blocks.`
 
@@ -73,12 +132,33 @@ async function callRouteLLM(prompt: string, apiKey: string): Promise<string> {
   return data?.choices?.[0]?.message?.content ?? ''
 }
 
+/**
+ * Parse raw JSON from LLM response, handling both clean JSON and markdown-wrapped JSON.
+ */
+function parseJsonResponse(content: string): any | null {
+  try {
+    return JSON.parse(content ?? '{}')
+  } catch {
+    const jsonMatch = content?.match?.(/\{[\s\S]*\}/)
+    if (jsonMatch?.[0]) {
+      try { return JSON.parse(jsonMatch[0]) } catch { /* fall through */ }
+    }
+    console.error('[ai] Failed to parse response:', content?.slice?.(0, 200))
+    return null
+  }
+}
+
 export async function analyzeCongressItem(item: RawCongressItem): Promise<Partial<Signal> | null> {
   const apiKey = getApiKey()
   if (!apiKey) {
     console.error('[ai] No ABACUSAI_API_KEY found.')
     return null
   }
+
+  // Build enrichment block — only included if enrichment data exists
+  const enrichmentBlock = item?.enrichment
+    ? `\nENRICHMENT DATA (from Congress.gov bill detail):\n${item.enrichment}`
+    : ''
 
   const prompt = ANALYSIS_PROMPT
     ?.replace?.('{type}', item?.type ?? 'unknown')
@@ -88,9 +168,10 @@ export async function analyzeCongressItem(item: RawCongressItem): Promise<Partia
     ?.replace?.('{bill_number}', item?.bill_number ?? 'N/A')
     ?.replace?.('{committee}', item?.committee ?? 'N/A')
     ?.replace?.('{legislators}', item?.legislators?.join?.(', ') ?? 'N/A')
+    ?.replace?.('{enrichment_block}', enrichmentBlock)
 
   try {
-    console.log(`[ai] Analyzing: ${item?.title?.slice?.(0, 60)}`)
+    console.log(`[ai] Analyzing: ${item?.title?.slice?.(0, 60)}${item?.enrichment ? ' [enriched]' : ''}`)
     const content = await callRouteLLM(prompt, apiKey)
 
     if (!content) {
@@ -98,18 +179,8 @@ export async function analyzeCongressItem(item: RawCongressItem): Promise<Partia
       return null
     }
 
-    let analysis: any
-    try {
-      analysis = JSON.parse(content ?? '{}')
-    } catch {
-      const jsonMatch = content?.match?.(/\{[\s\S]*\}/)
-      if (jsonMatch?.[0]) {
-        analysis = JSON.parse(jsonMatch[0])
-      } else {
-        console.error('[ai] Failed to parse response:', content?.slice?.(0, 200))
-        return null
-      }
-    }
+    const analysis = parseJsonResponse(content)
+    if (!analysis) return null
 
     console.log(`[ai] Success: ${item?.title?.slice?.(0, 40)}`)
     return {
@@ -133,6 +204,120 @@ export async function analyzeCongressItem(item: RawCongressItem): Promise<Partia
   } catch (err: any) {
     console.error(`[ai] Analysis failed:`, err?.message)
     return null
+  }
+}
+
+/**
+ * Analyze a USAspending contract award with optional bill context.
+ */
+export async function analyzeContractItem(
+  item: RawContractItem,
+  relatedBillSignals: Array<Partial<Signal>>
+): Promise<Partial<Signal> | null> {
+  const apiKey = getApiKey()
+  if (!apiKey) {
+    console.error('[ai] No ABACUSAI_API_KEY found.')
+    return null
+  }
+
+  // Build bill context from related signals
+  let billContext = 'No directly related bill signals found in database.'
+  if (relatedBillSignals.length > 0) {
+    const lines = relatedBillSignals.map(s =>
+      `- ${s.bill_number ?? 'N/A'}: "${s.title}" (${s.sentiment}, impact ${s.impact_score}/10, sectors: ${(s.affected_sectors ?? []).join(', ')})`
+    ).join('\n')
+    billContext = `RELATED BILL SIGNALS (from HillSignal database — use these to connect legislation to this contract):\n${lines}`
+  }
+
+  const amountStr = `$${(item.award_amount / 1_000_000).toFixed(1)}M`
+
+  const prompt = CONTRACT_ANALYSIS_PROMPT
+    .replace('{recipient}', item.recipient_name ?? 'Unknown')
+    .replace('{amount}', amountStr)
+    .replace('{agency}', item.awarding_agency ?? 'N/A')
+    .replace('{sub_agency}', item.awarding_sub_agency ?? 'N/A')
+    .replace('{description}', item.description ?? 'No description')
+    .replace('{contract_type}', item.contract_type ?? 'N/A')
+    .replace('{naics}', item.naics_code ?? 'N/A')
+    .replace('{start_date}', item.start_date ?? 'N/A')
+    .replace('{end_date}', item.end_date ?? 'N/A')
+    .replace('{bill_context}', billContext)
+
+  try {
+    console.log(`[ai] Analyzing contract: ${item.recipient_name} — ${amountStr}`)
+    const content = await callRouteLLM(prompt, apiKey)
+    if (!content) return null
+
+    const analysis = parseJsonResponse(content)
+    if (!analysis) return null
+
+    return {
+      event_type: 'contract_award',
+      title: `${item.recipient_name}: ${amountStr} ${item.awarding_agency} Contract`,
+      summary: analysis?.summary ?? 'Analysis unavailable',
+      full_analysis: analysis?.full_analysis ?? null,
+      impact_score: Math.min(10, Math.max(1, parseInt(analysis?.impact_score) || 5)),
+      sentiment: (['bullish', 'bearish', 'neutral']?.includes?.(analysis?.sentiment) ? analysis?.sentiment : 'neutral') as 'bullish' | 'bearish' | 'neutral',
+      affected_sectors: analysis?.affected_sectors ?? [],
+      tickers: analysis?.tickers ?? [],
+      source_url: item.source_url,
+      congress_gov_id: `contract-${item.generated_internal_id}`,
+      bill_number: null,
+      committee: null,
+      legislators: [],
+      event_date: item.start_date ?? new Date().toISOString(),
+      key_takeaways: analysis?.key_takeaways ?? [],
+      market_implications: analysis?.market_implications ?? null,
+    }
+  } catch (err: any) {
+    console.error(`[ai] Contract analysis failed:`, err?.message)
+    return null
+  }
+}
+
+/**
+ * Pre-filter contracts for market relevance (batch filter via AI).
+ */
+export async function filterContractsForRelevance(items: RawContractItem[]): Promise<RawContractItem[]> {
+  const apiKey = getApiKey()
+  if (!apiKey || items.length === 0) return items
+
+  const itemList = items.map((item, i) =>
+    `${i}: ${item.recipient_name} — $${(item.award_amount / 1_000_000).toFixed(1)}M from ${item.awarding_agency}. "${(item.description ?? '').slice(0, 120)}"`
+  ).join('\n')
+
+  const filterPrompt = `You are a federal contract analyst filtering USAspending awards for retail investors. Be STRICT — only keep contracts that are relevant to publicly traded companies or their direct competitors/suppliers.
+
+CONTRACT AWARDS:
+${itemList}
+
+INCLUDE only if:
+- The recipient IS or is a subsidiary of a publicly traded company (Lockheed Martin, Boeing, Raytheon/RTX, General Dynamics, Northrop Grumman, Palantir, Leidos, SAIC, BAE Systems, L3Harris, etc.)
+- OR the recipient is in a sector dominated by public companies (defense, IT services, pharma, construction) and the contract is large enough ($50M+) to signal sector trends
+- OR the contract description clearly relates to a publicly traded company's product line even if the recipient name is a subsidiary or JV
+
+EXCLUDE:
+- Small contracts to obscure private companies with no public market connection
+- Routine facility maintenance or generic supplies
+- Contracts where you cannot identify ANY relevant public company or sector
+
+Return: {"relevant_indices": [0, 2, 5]}
+If nothing qualifies: {"relevant_indices": []}
+
+Raw JSON only.`
+
+  try {
+    const content = await callRouteLLM(filterPrompt, apiKey)
+    const parsed = JSON.parse(content ?? '{}')
+    const indices: number[] = parsed?.relevant_indices ?? []
+    if (indices.length === 0) {
+      console.log('[ai] Contract filter returned 0 relevant items')
+      return []
+    }
+    return indices.filter(i => i >= 0 && i < items.length).map(i => items[i])
+  } catch (err: any) {
+    console.error('[ai] Contract filter failed, using all items:', err?.message)
+    return items
   }
 }
 

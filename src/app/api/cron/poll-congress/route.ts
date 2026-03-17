@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
-import { fetchAllRecent } from '@/lib/congress-api'
+import { fetchAllRecent, enrichBillItems } from '@/lib/congress-api'
 import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -103,8 +103,11 @@ async function runPoll() {
       return NextResponse.json({ status: 'ok', message: 'No market-relevant items', items_fetched: rawItems?.length ?? 0, items_new: newItems?.length ?? 0 })
     }
 
-    // 4. Analyze with RouteLLM (max 10 items per poll)
-    const toAnalyze = relevant?.slice?.(0, 10) ?? []
+    // 4. Enrich bills with full detail data (sponsors, subjects, CRS summaries)
+    const enriched = await enrichBillItems(relevant ?? [])
+
+    // 5. Analyze with RouteLLM (max 10 items per poll)
+    const toAnalyze = enriched?.slice?.(0, 10) ?? []
     console.log(`Analyzing ${toAnalyze?.length ?? 0} items with RouteLLM...`)
     const analyzed = await analyzeBatch(toAnalyze, 2)
     console.log(`Got ${analyzed?.length ?? 0} analyses`)

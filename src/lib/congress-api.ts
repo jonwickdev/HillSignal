@@ -78,6 +78,7 @@ export interface RawCongressItem {
   committee: string | null
   legislators: string[]
   bill_number: string | null
+  enrichment?: string | null
 }
 
 function getApiKey(): string {
@@ -245,4 +246,157 @@ export async function fetchAllRecent(fromDateTime?: string): Promise<RawCongress
 
   console.log(`[congress] fetchAllRecent total: ${results.length} items`)
   return results
+}
+
+/**
+ * Parse bill type and number from raw Congress.gov bill data.
+ * bill.type comes back lowercase (e.g. "hr", "s", "hjres", "sjres")
+ * bill.number is the numeric portion.
+ */
+function parseBillInfo(bill: any): { congress: number; billType: string; billNumber: string } | null {
+  const congress = bill?.congress ?? 119
+  const rawType = (bill?.type ?? '')?.toLowerCase?.()?.trim?.()
+  const number = bill?.number ?? ''
+  if (!rawType || !number) return null
+  return { congress, billType: rawType, billNumber: String(number) }
+}
+
+/**
+ * Strip HTML tags from CRS summary text.
+ */
+function stripHtml(html: string): string {
+  return (html ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Fetch enrichment data for a single bill: sponsors, subjects, committees, CRS summary.
+ * Uses a 5s timeout per request. Returns a formatted text block or null on failure.
+ */
+async function fetchBillEnrichment(bill: any): Promise<string | null> {
+  const info = parseBillInfo(bill)
+  if (!info) return null
+
+  const apiKey = getApiKey()
+  if (!apiKey) return null
+
+  const { congress, billType, billNumber } = info
+  const detailUrl = `${BASE_URL}/bill/${congress}/${billType}/${billNumber}?api_key=${apiKey}&format=json`
+  const summaryUrl = `${BASE_URL}/bill/${congress}/${billType}/${billNumber}/summaries?api_key=${apiKey}&format=json`
+
+  const parts: string[] = []
+
+  try {
+    // Fetch detail + summary in parallel with 5s timeout each
+    const [detailResult, summaryResult] = await Promise.allSettled([
+      fetch(detailUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(5000) })
+        .then(r => r?.ok ? r.json() : null),
+      fetch(summaryUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(5000) })
+        .then(r => r?.ok ? r.json() : null),
+    ])
+
+    // Extract detail info
+    if (detailResult?.status === 'fulfilled' && detailResult.value) {
+      const d = detailResult.value?.bill ?? {}
+
+      // Sponsors
+      const sponsors = d?.sponsors ?? []
+      if (sponsors.length > 0) {
+        const sponsorList = sponsors.map((s: any) =>
+          `${s?.fullName ?? 'Unknown'} (${s?.party ?? '?'}-${s?.state ?? '?'})`
+        ).join(', ')
+        parts.push(`Sponsors: ${sponsorList}`)
+      }
+
+      // Cosponsor count
+      const coCount = d?.cosponsors?.count ?? 0
+      if (coCount > 0) {
+        parts.push(`Cosponsors: ${coCount}`)
+      }
+
+      // Policy area
+      if (d?.policyArea?.name) {
+        parts.push(`Policy Area: ${d.policyArea.name}`)
+      }
+
+      // Committees
+      if (d?.committees?.count > 0) {
+        // committees.url is a link to fetch the list — just note the count
+        parts.push(`Referred to ${d.committees.count} committee(s)`)
+      }
+
+      // Legislative subjects
+      const subjects = d?.subjects?.legislativeSubjects ?? []
+      if (subjects.length > 0) {
+        parts.push(`Subjects: ${subjects.map((s: any) => s?.name).filter(Boolean).join(', ')}`)
+      }
+    }
+
+    // Extract CRS summary
+    if (summaryResult?.status === 'fulfilled' && summaryResult.value) {
+      const summaries = summaryResult.value?.summaries ?? []
+      // Use the most recent summary (last in array)
+      const latest = summaries[summaries.length - 1]
+      if (latest?.text) {
+        const cleanText = stripHtml(latest.text)
+        // Truncate to ~800 chars to fit in prompt without blowing token budget
+        const trimmed = cleanText.length > 800 ? cleanText.slice(0, 800) + '...' : cleanText
+        parts.push(`CRS Summary: ${trimmed}`)
+      }
+    }
+  } catch (err: any) {
+    console.log(`[congress] Enrichment failed for ${billType}${billNumber}: ${err?.message}`)
+    return null
+  }
+
+  if (parts.length === 0) return null
+  return parts.join('\n')
+}
+
+/**
+ * Enrich bill items with full detail data (sponsors, subjects, CRS summaries).
+ * Non-bill items pass through unchanged. Enrichment failures are silent (item keeps original data).
+ * Runs enrichment in parallel with a cap of 5 concurrent requests.
+ */
+export async function enrichBillItems(items: RawCongressItem[]): Promise<RawCongressItem[]> {
+  const bills = items.filter(i => i.type === 'bill')
+  const nonBills = items.filter(i => i.type !== 'bill')
+
+  if (bills.length === 0) return items
+
+  console.log(`[congress] Enriching ${bills.length} bills with detail data...`)
+  const startMs = Date.now()
+
+  // Process in chunks of 5 to avoid hammering the API
+  const enriched: RawCongressItem[] = []
+  for (let i = 0; i < bills.length; i += 5) {
+    const chunk = bills.slice(i, i + 5)
+    const results = await Promise.allSettled(
+      chunk.map(async (item) => {
+        const text = await fetchBillEnrichment(item.raw)
+        return { ...item, enrichment: text }
+      })
+    )
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        enriched.push(r.value)
+      } else {
+        // If enrichment failed, keep original item
+        enriched.push(chunk[results.indexOf(r)])
+      }
+    }
+  }
+
+  const elapsed = Date.now() - startMs
+  const enrichedCount = enriched.filter(b => b.enrichment).length
+  console.log(`[congress] Enrichment done: ${enrichedCount}/${bills.length} bills enriched in ${elapsed}ms`)
+
+  return [...enriched, ...nonBills]
 }
