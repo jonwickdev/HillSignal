@@ -111,8 +111,8 @@ export async function fetchRecentBills(fromDateTime?: string, limit: number = 20
   const apiKey = getApiKey()
   if (!apiKey) throw new Error('CONGRESS_API_KEY not configured')
 
-  // Keep limit small to stay within Vercel timeout (10s hobby / 60s pro)
-  const fetchLimit = Math.min(limit, 20)
+  // Congress.gov allows up to 250 per request, 5000 req/hr
+  const fetchLimit = Math.min(limit, 250)
   let url = `${BASE_URL}/bill?api_key=${apiKey}&format=json&sort=updateDate+desc&limit=${fetchLimit}`
   if (fromDateTime) {
     url += `&fromDateTime=${fromDateTime}`
@@ -230,9 +230,9 @@ export async function fetchAllRecent(fromDateTime?: string): Promise<RawCongress
 
   // Fetch bills, votes, meetings IN PARALLEL to save time on Vercel
   const [billsResult, votesResult, meetingsResult] = await Promise.allSettled([
-    fetchRecentBills(fromDateTime, 15),
-    fetchRecentVotes(10),
-    fetchCommitteeMeetings(10),
+    fetchRecentBills(fromDateTime, 100),
+    fetchRecentVotes(20),
+    fetchCommitteeMeetings(20),
   ])
 
   if (billsResult?.status === 'fulfilled') results.push(...(billsResult.value ?? []))

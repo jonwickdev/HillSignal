@@ -55,14 +55,14 @@ async function runPoll() {
       // First poll - no state yet
     }
 
-    // Cooldown: skip if polled within 10 min
+    // Cooldown: skip if polled within 5 min
     if (fromDateTime) {
       const lastPoll = new Date(fromDateTime)?.getTime?.() ?? 0
-      const tenMinAgo = Date.now() - 10 * 60 * 1000
+      const tenMinAgo = Date.now() - 5 * 60 * 1000
       if (lastPoll > tenMinAgo) {
         return NextResponse.json({
           status: 'skipped',
-          message: 'Last poll was less than 10 minutes ago',
+          message: 'Last poll was less than 5 minutes ago',
           last_poll: fromDateTime,
         })
       }
@@ -106,8 +106,8 @@ async function runPoll() {
     // 4. Enrich bills with full detail data (sponsors, subjects, CRS summaries)
     const enriched = await enrichBillItems(relevant ?? [])
 
-    // 5. Analyze with RouteLLM (max 10 items per poll)
-    const toAnalyze = enriched?.slice?.(0, 10) ?? []
+    // 5. Analyze with RouteLLM (max 20 items per poll)
+    const toAnalyze = enriched?.slice?.(0, 20) ?? []
     console.log(`Analyzing ${toAnalyze?.length ?? 0} items with RouteLLM...`)
     const analyzed = await analyzeBatch(toAnalyze, 2)
     console.log(`Got ${analyzed?.length ?? 0} analyses`)

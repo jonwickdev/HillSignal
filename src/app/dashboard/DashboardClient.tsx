@@ -42,6 +42,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [polling, setPolling] = useState(false)
+  const [pollResult, setPollResult] = useState<{ time: string; newSignals: number; message: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedSector, setSelectedSector] = useState<string>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -70,6 +71,13 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400)
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  // Auto-dismiss poll result after 10 seconds
+  useEffect(() => {
+    if (!pollResult) return
+    const t = setTimeout(() => setPollResult(null), 10000)
+    return () => clearTimeout(t)
+  }, [pollResult])
 
   // Re-fetch when search or filters change
   useEffect(() => {
@@ -117,9 +125,14 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
         if (selectedType !== 'all') billParams.set('event_type', selectedType)
         billParams.set('limit', String(PAGE_SIZE))
 
+        // Pass active sector to contract poll for context-aware fetching
+        const contractUrl = selectedSector !== 'all'
+          ? `/api/cron/poll-contracts?sector=${encodeURIComponent(selectedSector)}`
+          : '/api/cron/poll-contracts'
+
         const [billRes, contractRes] = await Promise.allSettled([
           fetch(`/api/signals?${billParams.toString()}`),
-          fetch('/api/cron/poll-contracts'),
+          fetch(contractUrl),
         ])
 
         // Parse contract poll result once (non-blocking — don't fail if contracts error)
@@ -133,11 +146,14 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
         }
 
         // Use bill poll result for the signal list
+        let billStored = 0
         if (billRes.status === 'fulfilled') {
           const data = await billRes.value?.json?.()
           if (!billRes.value?.ok) throw new Error(data?.error ?? 'Failed to fetch signals')
+          const prevCount = signals.length
           setSignals(data?.signals ?? [])
           setHasMore(data?.hasMore ?? false)
+          billStored = Math.max(0, (data?.signals?.length ?? 0) - prevCount)
 
           // If contract poll stored new signals, re-fetch to include them in the list
           if (contractStored > 0) {
@@ -156,6 +172,18 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
         } else {
           throw new Error('Failed to poll Congress.gov')
         }
+
+        // Set poll result feedback
+        const totalNew = contractStored + billStored
+        const now = new Date()
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        setPollResult({
+          time: timeStr,
+          newSignals: totalNew,
+          message: totalNew > 0
+            ? `${totalNew} new signal${totalNew > 1 ? 's' : ''} found`
+            : 'No new Congressional activity since last poll',
+        })
       } else {
         // Normal fetch (no polling)
         const params = new URLSearchParams()
@@ -179,7 +207,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       setRefreshing(false)
       setPolling(false)
     }
-  }, [debouncedSearch, selectedSentiment, selectedType])
+  }, [debouncedSearch, selectedSentiment, selectedType, selectedSector])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
@@ -373,6 +401,22 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
             {refreshing ? 'Polling...' : 'Poll Now'}
           </Button>
         </div>
+
+        {/* Poll result feedback */}
+        {pollResult && (
+          <div className={`mb-4 flex items-center justify-between rounded-lg border px-4 py-3 text-sm ${
+            pollResult.newSignals > 0
+              ? 'border-hill-green/30 bg-hill-green/10 text-hill-green'
+              : 'border-hill-border bg-hill-dark text-hill-muted'
+          }`}>
+            <span>
+              {pollResult.message} <span className="opacity-60">— {pollResult.time}</span>
+            </span>
+            <button onClick={() => setPollResult(null)} className="ml-3 opacity-60 hover:opacity-100 transition-opacity">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Search bar */}
         <div className="relative mb-6">

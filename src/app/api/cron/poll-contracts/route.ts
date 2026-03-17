@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
-import { fetchRecentContracts } from '@/lib/usaspending-api'
+import { fetchRecentContracts, fetchSectorContracts, SECTOR_NAICS_MAP } from '@/lib/usaspending-api'
 import { analyzeContractItem, filterContractsForRelevance } from '@/lib/gemini-analysis'
 import type { RawContractItem } from '@/lib/gemini-analysis'
 import type { Signal } from '@/lib/types'
@@ -36,7 +36,9 @@ export async function GET(request: Request) {
     }
   }
 
-  return runContractPoll()
+  // Optional: target specific sector for context-aware polling
+  const targetSector = url.searchParams.get('sector') ?? undefined
+  return runContractPoll(targetSector)
 }
 
 export async function POST(request: Request) {
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
   return runContractPoll()
 }
 
-async function runContractPoll() {
+async function runContractPoll(targetSector?: string) {
   const startTime = Date.now()
 
   try {
@@ -81,19 +83,38 @@ async function runContractPoll() {
         .eq('id', 'contracts')
         .single()
       const lastPoll = new Date(pollState?.last_poll_time ?? 0).getTime()
-      const thirtyMinAgo = Date.now() - 30 * 60 * 1000
-      if (lastPoll > thirtyMinAgo) {
+      const fifteenMinAgo = Date.now() - 15 * 60 * 1000
+      if (lastPoll > fifteenMinAgo) {
         return NextResponse.json({
           status: 'skipped',
-          message: 'Last contract poll was less than 30 minutes ago',
+          message: 'Last contract poll was less than 15 minutes ago',
         })
       }
     }
 
-    // 1. Fetch recent contracts from USAspending
-    console.log('[contracts] Polling USAspending.gov...')
-    const rawContracts = await fetchRecentContracts(sinceDate, 25_000_000, 30)
-    console.log(`[contracts] Fetched ${rawContracts.length} contracts`)
+    // 1. Fetch contracts: generic large contracts + sector-targeted in parallel
+    // If a target sector is specified (from Poll Now), prioritize that sector
+    const sectorsToFetch = targetSector && SECTOR_NAICS_MAP[targetSector]
+      ? [targetSector]
+      : Object.keys(SECTOR_NAICS_MAP)
+    const sectorLimit = targetSector ? 25 : 10
+    console.log(`[contracts] Polling USAspending.gov (generic + ${sectorsToFetch.length} sectors${targetSector ? ` [targeted: ${targetSector}]` : ''})...`)
+    const [genericResult, sectorResult] = await Promise.allSettled([
+      fetchRecentContracts(sinceDate, 25_000_000, 75),
+      fetchSectorContracts(sectorsToFetch, sinceDate, sectorLimit),
+    ])
+
+    // Merge and deduplicate
+    const genericContracts = genericResult.status === 'fulfilled' ? genericResult.value : []
+    const sectorContracts = sectorResult.status === 'fulfilled' ? sectorResult.value : []
+    const mergedMap = new Map<string, RawContractItem>()
+    for (const c of [...genericContracts, ...sectorContracts]) {
+      if (!mergedMap.has(c.generated_internal_id)) {
+        mergedMap.set(c.generated_internal_id, c)
+      }
+    }
+    const rawContracts = Array.from(mergedMap.values())
+    console.log(`[contracts] Fetched ${genericContracts.length} generic + ${sectorContracts.length} sector-targeted → ${rawContracts.length} unique`)
 
     if (rawContracts.length === 0) {
       await updateContractPollState(adminClient, 0, 0, null)
@@ -136,8 +157,8 @@ async function runContractPoll() {
 
     const billSignals: Array<Partial<Signal>> = (recentBillSignals ?? []) as Array<Partial<Signal>>
 
-    // 5. Analyze each contract (max 8 per poll to stay within 60s)
-    const toAnalyze = relevant.slice(0, 8)
+    // 5. Analyze each contract (max 15 per poll)
+    const toAnalyze = relevant.slice(0, 15)
     console.log(`[contracts] Analyzing ${toAnalyze.length} contracts...`)
 
     const analyzed: Array<Partial<Signal>> = []

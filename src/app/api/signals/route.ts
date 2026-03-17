@@ -31,7 +31,7 @@ export async function GET(request: Request) {
         console.log('[signals] Refresh requested — running poll inline...')
         const adminClient = createAdminClient()
 
-        // Check rate limit (2 min cooldown, skipped if force=true)
+        // Check rate limit (1 min cooldown, skipped if force=true)
         let skipPoll = false
         if (!force) {
           try {
@@ -41,8 +41,8 @@ export async function GET(request: Request) {
               .single()
             if (pollState?.last_poll_time) {
               const lastPoll = new Date(pollState.last_poll_time)?.getTime?.() ?? 0
-              if (lastPoll > Date.now() - 2 * 60 * 1000) {
-                console.log('[signals] Skipping poll — last poll was < 2 min ago')
+              if (lastPoll > Date.now() - 1 * 60 * 1000) {
+                console.log('[signals] Skipping poll — last poll was < 1 min ago')
                 skipPoll = true
               }
             }
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
               const relevant = await filterForMarketRelevance(newItems)
               console.log(`[signals] ${relevant.length}/${newItems.length} items deemed market-relevant`)
 
-              const toAnalyze = relevant?.slice?.(0, 10) ?? []
+              const toAnalyze = relevant?.slice?.(0, 20) ?? []
               console.log(`[signals] Analyzing ${toAnalyze?.length} items with AI...`)
               const analyzed = await analyzeBatch(toAnalyze, 5)
 
