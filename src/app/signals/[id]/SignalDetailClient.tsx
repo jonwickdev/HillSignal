@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { Signal } from '@/lib/types'
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users } from 'lucide-react'
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
   bullish: { color: 'text-hill-green', bg: 'bg-hill-green/10', border: 'border-hill-green/30', label: 'Bullish', Icon: TrendingUp },
@@ -15,6 +15,12 @@ const sentimentConfig: Record<string, { color: string; bg: string; border: strin
 export default function SignalDetailClient({ signal }: { signal: Signal }) {
   const sentiment = sentimentConfig?.[signal?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
   const SentimentIcon = sentiment?.Icon ?? Minus
+  const hasAnalysis = !!(signal?.full_analysis && signal.full_analysis.length > 0)
+  const hasSummary = !!(signal?.summary && signal.summary.length > 0)
+  const hasTickers = (signal?.tickers?.length ?? 0) > 0
+  const hasTakeaways = (signal?.key_takeaways?.length ?? 0) > 0
+  const hasImplications = !!(signal?.market_implications && signal.market_implications.length > 0)
+  const hasLegislators = (signal?.legislators?.length ?? 0) > 0
 
   return (
     <div className="min-h-screen bg-hill-black">
@@ -28,6 +34,19 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
+        {/* Tracked-only banner — no AI analysis yet */}
+        {!hasAnalysis && (
+          <div className="mb-6 bg-hill-blue/10 border border-hill-blue/30 rounded-xl p-5 flex items-start gap-4">
+            <FileText size={20} className="text-hill-blue shrink-0 mt-0.5" />
+            <div>
+              <p className="text-hill-white font-semibold text-sm mb-1">This bill is being tracked</p>
+              <p className="text-hill-muted text-sm leading-relaxed">
+                HillSignal has recorded this legislation from Congress.gov. Full AI market analysis — including affected tickers, key takeaways, and market implications — has not been generated yet. Check back as analysis is added to tracked bills over time.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Title area */}
         <div className="mb-8">
           <div className="flex items-center gap-2 text-xs text-hill-muted font-mono mb-3">
@@ -36,6 +55,12 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
             <span>\u2022</span>
             <Clock size={12} />
             <span>{signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown date'}</span>
+            {/* Status badge */}
+            {hasAnalysis ? (
+              <span className="ml-2 px-2 py-0.5 bg-hill-green/10 text-hill-green border border-hill-green/30 rounded text-xs font-medium">Analyzed</span>
+            ) : (
+              <span className="ml-2 px-2 py-0.5 bg-hill-gray text-hill-muted border border-hill-border rounded text-xs">Tracked</span>
+            )}
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-hill-white leading-tight mb-4">{signal?.title ?? 'Untitled Signal'}</h1>
           <div className="flex flex-wrap items-center gap-3">
@@ -55,23 +80,27 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
         </div>
 
         {/* Tickers & Sectors */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {(signal?.tickers ?? [])?.map?.((t: string) => (
-            <span key={t} className="bg-hill-orange/10 border border-hill-orange/30 text-hill-orange px-4 py-2 rounded-lg text-sm font-mono font-semibold">{t}</span>
-          ))}
-          {(signal?.affected_sectors ?? [])?.map?.((s: string) => (
-            <span key={s} className="bg-hill-gray px-4 py-2 rounded-lg text-sm text-hill-text border border-hill-border">{s}</span>
-          ))}
-        </div>
+        {(hasTickers || (signal?.affected_sectors?.length ?? 0) > 0) && (
+          <div className="flex flex-wrap gap-2 mb-8">
+            {(signal?.tickers ?? [])?.map?.((t: string) => (
+              <span key={t} className="bg-hill-orange/10 border border-hill-orange/30 text-hill-orange px-4 py-2 rounded-lg text-sm font-mono font-semibold">{t}</span>
+            ))}
+            {(signal?.affected_sectors ?? [])?.map?.((s: string) => (
+              <span key={s} className="bg-hill-gray px-4 py-2 rounded-lg text-sm text-hill-text border border-hill-border">{s}</span>
+            ))}
+          </div>
+        )}
 
-        {/* Summary */}
-        <Card className="mb-6">
-          <h2 className="text-lg font-semibold text-hill-white mb-3">Summary</h2>
-          <p className="text-hill-text leading-relaxed">{signal?.summary ?? 'No summary available.'}</p>
-        </Card>
+        {/* Summary — only if non-empty */}
+        {hasSummary && (
+          <Card className="mb-6">
+            <h2 className="text-lg font-semibold text-hill-white mb-3">Summary</h2>
+            <p className="text-hill-text leading-relaxed">{signal.summary}</p>
+          </Card>
+        )}
 
         {/* Key Takeaways */}
-        {(signal?.key_takeaways?.length ?? 0) > 0 && (
+        {hasTakeaways && (
           <Card className="mb-6">
             <h2 className="text-lg font-semibold text-hill-white mb-3">Key Takeaways</h2>
             <ul className="space-y-3">
@@ -86,7 +115,7 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
         )}
 
         {/* Market Implications */}
-        {signal?.market_implications && (
+        {hasImplications && (
           <Card className="mb-6">
             <h2 className="text-lg font-semibold text-hill-white mb-3">Market Implications</h2>
             <p className="text-hill-text leading-relaxed">{signal.market_implications}</p>
@@ -94,7 +123,7 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
         )}
 
         {/* Full Analysis */}
-        {signal?.full_analysis && (
+        {hasAnalysis && (
           <Card className="mb-6">
             <h2 className="text-lg font-semibold text-hill-white mb-3">Full Analysis</h2>
             <div className="text-hill-text leading-relaxed whitespace-pre-line">{signal.full_analysis}</div>
@@ -102,7 +131,7 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
         )}
 
         {/* Legislators */}
-        {(signal?.legislators?.length ?? 0) > 0 && (
+        {hasLegislators && (
           <Card className="mb-6">
             <h2 className="text-lg font-semibold text-hill-white mb-3 flex items-center gap-2"><Users size={18} /> Key Legislators</h2>
             <div className="flex flex-wrap gap-2">

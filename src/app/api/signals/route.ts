@@ -8,7 +8,18 @@ import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
 
 /**
  * GET /api/signals
- * Fetches signals from Supabase. If ?refresh=true, runs a poll first then returns results.
+ * Fetches signals from Supabase.
+ * Query params:
+ *   - view: 'analyzed' (default) | 'tracker' — controls quality filters
+ *   - sector: sector name to filter by
+ *   - sentiment: bullish | bearish | neutral
+ *   - event_type: bill | vote | hearing | contract_award
+ *   - search: text search
+ *   - limit: page size (default 50)
+ *   - offset: pagination offset
+ *   - ids: comma-separated IDs for specific signals
+ *   - refresh: trigger inline poll
+ *   - force: skip rate limit on poll
  */
 export async function GET(request: Request) {
   try {
@@ -23,6 +34,7 @@ export async function GET(request: Request) {
     const refresh = searchParams?.get?.('refresh') === 'true'
     const force = searchParams?.get?.('force') === 'true'
     const sector = searchParams?.get?.('sector')
+    const view = searchParams?.get?.('view') ?? 'analyzed'
     const limit = parseInt(searchParams?.get?.('limit') ?? '50') || 50
 
     // If refresh requested, run the poll SYNCHRONOUSLY before returning
@@ -150,9 +162,9 @@ export async function GET(request: Request) {
 
       if (idErr) {
         console.error('[signals] ID fetch FAILED:', idErr.message)
-        return NextResponse.json({ signals: [], hasMore: false }, { status: 200 })
+        return NextResponse.json({ signals: [], hasMore: false, totalCount: 0 }, { status: 200 })
       }
-      return NextResponse.json({ signals: idData ?? [], hasMore: false })
+      return NextResponse.json({ signals: idData ?? [], hasMore: false, totalCount: idData?.length ?? 0 })
     }
 
     // 90-day window for normal feed
@@ -160,12 +172,19 @@ export async function GET(request: Request) {
 
     let query = readClient
       .from('signals')
-      .select('*')
-      .gt('impact_score', 3)                    // Only show signals with real impact
-      .not('affected_sectors', 'eq', '{}')      // Must have at least one affected sector
-      .gte('event_date', ninetyDaysAgo)         // 90-day retention window
+      .select('*', { count: 'exact' })
+
+    // Quality filters — only for 'analyzed' view (default)
+    if (view !== 'tracker') {
+      query = query
+        .gt('impact_score', 3)                    // Only show signals with real impact
+        .not('affected_sectors', 'eq', '{}')      // Must have at least one affected sector
+    }
+
+    query = query
+      .gte('event_date', ninetyDaysAgo)           // 90-day retention window
       .order('event_date', { ascending: false })
-      .range(offset, offset + limit)            // Pagination via offset
+      .range(offset, offset + limit - 1)          // Inclusive range
 
     if (sector && sector !== 'all') {
       query = query.contains('affected_sectors', [sector])
@@ -188,20 +207,21 @@ export async function GET(request: Request) {
       query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,tickers::text.ilike.%${search}%,event_type.ilike.%${search}%`)
     }
 
-    const { data, error } = await query
+    const { data, count, error } = await query
 
     if (error) {
       console.error('[signals] Read FAILED:', error.message, error.details)
-      return NextResponse.json({ signals: [], hasMore: false, error: error?.message ?? 'Database error' }, { status: 200 })
+      return NextResponse.json({ signals: [], hasMore: false, totalCount: 0, error: error?.message ?? 'Database error' }, { status: 200 })
     }
 
-    const hasMore = (data?.length ?? 0) > limit
-    const signals = hasMore ? data?.slice(0, limit) : (data ?? [])
+    const totalCount = count ?? 0
+    const signals = data ?? []
+    const hasMore = (offset + signals.length) < totalCount
 
-    console.log(`[signals] Returning ${signals?.length ?? 0} signals to client (offset=${offset}, hasMore=${hasMore})`)
-    return NextResponse.json({ signals, hasMore })
+    console.log(`[signals] Returning ${signals.length} signals (view=${view}, offset=${offset}, total=${totalCount}, hasMore=${hasMore})`)
+    return NextResponse.json({ signals, hasMore, totalCount })
   } catch (error: any) {
     console.error('Signals API error:', error)
-    return NextResponse.json({ signals: [], error: error?.message ?? 'Failed to fetch signals' }, { status: 500 })
+    return NextResponse.json({ signals: [], hasMore: false, totalCount: 0, error: error?.message ?? 'Failed to fetch signals' }, { status: 500 })
   }
 }

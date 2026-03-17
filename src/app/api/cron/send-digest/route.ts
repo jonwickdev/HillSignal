@@ -6,14 +6,14 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/cron/send-digest?secret=CRON_SECRET
- * Called by Supabase pg_cron (or manually) to send digest emails.
+ * Called by cron-job.org to send digest emails.
  * Respects each user's email_frequency + daily_digest preferences.
+ * Only includes fully analyzed signals (with AI analysis) — never sends empty shells.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const secret = searchParams.get('secret')
 
-  // Also accept Bearer token (for Vercel cron compatibility)
   const authHeader = request.headers.get('authorization')
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
 
@@ -46,12 +46,8 @@ async function sendDigest() {
 
   // Filter users who should receive a digest right now
   const eligibleUsers = allPrefs.filter((p: any) => {
-    // Must have daily_digest enabled
     if (!p.daily_digest) return false
-    // If daily_digest is on, send daily by default
-    // Weekly users only get it on Monday
     if (p.email_frequency === 'weekly') return isMonday
-    // All other frequencies (daily, instant, or any) get the daily digest
     return true
   })
 
@@ -59,15 +55,17 @@ async function sendDigest() {
     return NextResponse.json({ sent: 0, message: 'No eligible users today' })
   }
 
-  // Fetch recent signals — last 24h for daily, last 7 days for weekly
-  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+  // Fetch recent ANALYZED signals — last 7 days (covers both daily and weekly)
+  // Only include signals with actual AI analysis (full_analysis IS NOT NULL)
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
 
-  // Get signals from the last 7 days (covers both daily and weekly)
   const { data: recentSignals, error: sigError } = await supabase
     .from('signals')
-    .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date, created_at')
+    .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date, created_at, full_analysis')
     .gte('created_at', sevenDaysAgo)
+    .not('full_analysis', 'is', null)           // Must have AI analysis
+    .gt('impact_score', 3)                       // Must have real impact
     .order('impact_score', { ascending: false })
     .limit(100)
 
@@ -77,7 +75,7 @@ async function sendDigest() {
   }
 
   if (!recentSignals || recentSignals.length === 0) {
-    return NextResponse.json({ sent: 0, message: 'No recent signals to send' })
+    return NextResponse.json({ sent: 0, message: 'No analyzed signals to send' })
   }
 
   // Get user emails
@@ -120,7 +118,7 @@ async function sendDigest() {
     // If user has sector preferences, filter (but always include high-impact)
     if (pref.sectors && pref.sectors.length > 0) {
       userSignals = userSignals.filter((s: any) => {
-        if (s.impact_score >= 8) return true // Always include high-impact
+        if (s.impact_score >= 8) return true
         return s.affected_sectors?.some((sec: string) =>
           pref.sectors.some((ps: string) => sec.toLowerCase().includes(ps.toLowerCase()))
         )
@@ -203,7 +201,7 @@ function buildDigestEmail(signals: any[], isWeekly: boolean): string {
           ${s.title}
         </a>
         <p style="color:#94a3b8;font-size:14px;margin:8px 0 4px;line-height:1.5;">
-          ${s.summary?.slice(0, 200)}${s.summary?.length > 200 ? '...' : ''}
+          ${s.summary?.slice(0, 200)}${(s.summary?.length ?? 0) > 200 ? '...' : ''}
         </p>
         ${s.tickers?.length ? `<div style="margin-top:6px;">${s.tickers.map((t: string) => `<span style="background:#1e3a5f;color:#60a5fa;padding:2px 6px;border-radius:3px;font-size:11px;margin-right:4px;">$${t}</span>`).join('')}</div>` : ''}
       </td>
