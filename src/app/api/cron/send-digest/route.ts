@@ -66,7 +66,7 @@ async function sendDigest() {
   // Get signals from the last 7 days (covers both daily and weekly)
   const { data: recentSignals, error: sigError } = await supabase
     .from('signals')
-    .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date')
+    .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date, created_at')
     .gte('created_at', sevenDaysAgo)
     .order('impact_score', { ascending: false })
     .limit(100)
