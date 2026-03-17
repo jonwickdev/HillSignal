@@ -183,9 +183,9 @@ export async function GET(request: Request) {
       query = query.eq('event_type', eventType)
     }
 
-    // Server-side text search (title, summary, and tickers array cast to text)
+    // Server-side text search (title, summary, tickers, and event_type)
     if (search) {
-      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,tickers::text.ilike.%${search}%`)
+      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,tickers::text.ilike.%${search}%,event_type.ilike.%${search}%`)
     }
 
     const { data, error } = await query

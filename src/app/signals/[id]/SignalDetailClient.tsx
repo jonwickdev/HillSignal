@@ -137,7 +137,7 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
         <div className="flex flex-wrap gap-4">
           {signal?.source_url && (
             <a href={signal.source_url} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary">View on Congress.gov <ExternalLink size={14} className="ml-2" /></Button>
+              <Button variant="secondary">View on {signal?.event_type === 'contract_award' ? 'USAspending.gov' : 'Congress.gov'} <ExternalLink size={14} className="ml-2" /></Button>
             </a>
           )}
           <Link href="/dashboard"><Button variant="ghost"><ArrowLeft size={14} className="mr-2" /> Back to Feed</Button></Link>

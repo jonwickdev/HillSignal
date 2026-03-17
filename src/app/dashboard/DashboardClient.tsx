@@ -332,10 +332,8 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
   )?.sort?.()
   const sectors = ['all', ...(allSectors ?? [])]
 
-  // Derive unique event types from loaded signals
-  const eventTypes = Array.from(
-    new Set((signals ?? [])?.map?.((s: Signal) => s?.event_type)?.filter?.(Boolean))
-  )?.sort?.() ?? []
+  // All known event types — always show these pills regardless of loaded signals
+  const eventTypes = ['bill', 'vote', 'hearing', 'contract_award']
 
   return (
     <div className="min-h-screen bg-hill-black">
@@ -690,7 +688,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
                         </Link>
                         {signal?.source_url && (
                           <a href={signal.source_url} target="_blank" rel="noopener noreferrer" className="text-sm text-hill-muted hover:text-hill-white flex items-center gap-1">
-                            Congress.gov <ExternalLink size={12} />
+                            {signal?.event_type === 'contract_award' ? 'USAspending.gov' : 'Congress.gov'} <ExternalLink size={12} />
                           </a>
                         )}
                       </div>
