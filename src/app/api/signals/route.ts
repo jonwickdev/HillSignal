@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createServerSupabaseClient } from '@/lib/supabase/server'
 import { fetchAllRecent } from '@/lib/congress-api'
 import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
 
@@ -12,6 +12,13 @@ import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
  */
 export async function GET(request: Request) {
   try {
+    // Authenticate user
+    const supabase = await createServerSupabaseClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request?.url ?? '')
     const refresh = searchParams?.get?.('refresh') === 'true'
     const force = searchParams?.get?.('force') === 'true'

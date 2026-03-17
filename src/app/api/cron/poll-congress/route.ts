@@ -20,8 +20,12 @@ export async function GET(request: Request) {
   return runPoll()
 }
 
-/** POST handler kept for manual triggers */
+/** POST handler for manual triggers — also requires cron secret */
 export async function POST(request: Request) {
+  const authHeader = request.headers.get('authorization')
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   return runPoll()
 }
 
