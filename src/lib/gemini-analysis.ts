@@ -286,20 +286,21 @@ export async function filterContractsForRelevance(items: RawContractItem[]): Pro
     `${i}: ${item.recipient_name} — $${(item.award_amount / 1_000_000).toFixed(1)}M from ${item.awarding_agency}. "${(item.description ?? '').slice(0, 120)}"`
   ).join('\n')
 
-  const filterPrompt = `You are a federal contract analyst filtering USAspending awards for retail investors. Be STRICT — only keep contracts that are relevant to publicly traded companies or their direct competitors/suppliers.
+  const filterPrompt = `You are a federal contract analyst filtering USAspending awards for retail investors. Keep contracts that have ANY connection to publicly traded companies or their sectors — across ALL industries, not just defense.
 
 CONTRACT AWARDS:
 ${itemList}
 
-INCLUDE only if:
-- The recipient IS or is a subsidiary of a publicly traded company (Lockheed Martin, Boeing, Raytheon/RTX, General Dynamics, Northrop Grumman, Palantir, Leidos, SAIC, BAE Systems, L3Harris, etc.)
-- OR the recipient is in a sector dominated by public companies (defense, IT services, pharma, construction) and the contract is large enough ($50M+) to signal sector trends
-- OR the contract description clearly relates to a publicly traded company's product line even if the recipient name is a subsidiary or JV
+INCLUDE if ANY of these apply:
+- The recipient IS or is a subsidiary/JV of a publicly traded company — in ANY sector (defense, tech, healthcare, pharma, energy, construction, telecom, consulting, logistics, manufacturing, etc.)
+- The contract is in a sector with major public company players and is large enough ($25M+) to signal spending trends — even if the specific recipient is private, the sector signal matters (e.g., a $50M HHS IT contract signals spending relevant to Accenture, Booz Allen, CACI, etc.)
+- The awarding agency or contract description clearly relates to an industry where public companies compete (e.g., DOE energy contracts → NextEra, Duke Energy; HHS pharma contracts → Pfizer, Merck; GSA IT contracts → Palantir, SAIC)
+- The contract represents a meaningful shift in government spending priorities that affects an entire sector
 
-EXCLUDE:
-- Small contracts to obscure private companies with no public market connection
-- Routine facility maintenance or generic supplies
-- Contracts where you cannot identify ANY relevant public company or sector
+EXCLUDE only if:
+- The recipient is a small private company with zero connection to any public company or investable sector
+- The contract is routine facility maintenance, janitorial, or generic office supplies with no sector signal
+- You genuinely cannot identify ANY public company, ETF sector, or industry trend this contract touches
 
 Return: {"relevant_indices": [0, 2, 5]}
 If nothing qualifies: {"relevant_indices": []}

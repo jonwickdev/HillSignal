@@ -107,19 +107,70 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
       }
       setError(null)
 
-      const params = new URLSearchParams()
-      if (refresh) { params.set('refresh', 'true'); params.set('force', 'true') }
-      if (debouncedSearch) params.set('search', debouncedSearch)
-      if (selectedSentiment !== 'all') params.set('sentiment', selectedSentiment)
-      if (selectedType !== 'all') params.set('event_type', selectedType)
-      params.set('limit', String(PAGE_SIZE))
+      if (refresh) {
+        // Fire BOTH bill poll and contract poll in parallel — each gets its own 60s budget
+        const billParams = new URLSearchParams()
+        billParams.set('refresh', 'true')
+        billParams.set('force', 'true')
+        if (debouncedSearch) billParams.set('search', debouncedSearch)
+        if (selectedSentiment !== 'all') billParams.set('sentiment', selectedSentiment)
+        if (selectedType !== 'all') billParams.set('event_type', selectedType)
+        billParams.set('limit', String(PAGE_SIZE))
 
-      const res = await fetch(`/api/signals?${params.toString()}`)
-      const data = await res?.json?.()
+        const [billRes, contractRes] = await Promise.allSettled([
+          fetch(`/api/signals?${billParams.toString()}`),
+          fetch('/api/cron/poll-contracts'),
+        ])
 
-      if (!res?.ok) throw new Error(data?.error ?? 'Failed to fetch signals')
-      setSignals(data?.signals ?? [])
-      setHasMore(data?.hasMore ?? false)
+        // Parse contract poll result once (non-blocking — don't fail if contracts error)
+        let contractStored = 0
+        if (contractRes.status === 'fulfilled') {
+          const cData = await contractRes.value?.json?.().catch(() => null)
+          contractStored = cData?.items_stored ?? 0
+          console.log('[poll-now] Contract poll:', cData?.status, contractStored ? `${contractStored} new` : '')
+        } else {
+          console.warn('[poll-now] Contract poll failed:', (contractRes as PromiseRejectedResult).reason)
+        }
+
+        // Use bill poll result for the signal list
+        if (billRes.status === 'fulfilled') {
+          const data = await billRes.value?.json?.()
+          if (!billRes.value?.ok) throw new Error(data?.error ?? 'Failed to fetch signals')
+          setSignals(data?.signals ?? [])
+          setHasMore(data?.hasMore ?? false)
+
+          // If contract poll stored new signals, re-fetch to include them in the list
+          if (contractStored > 0) {
+            const refreshParams = new URLSearchParams()
+            if (debouncedSearch) refreshParams.set('search', debouncedSearch)
+            if (selectedSentiment !== 'all') refreshParams.set('sentiment', selectedSentiment)
+            if (selectedType !== 'all') refreshParams.set('event_type', selectedType)
+            refreshParams.set('limit', String(PAGE_SIZE))
+            const finalRes = await fetch(`/api/signals?${refreshParams.toString()}`)
+            const finalData = await finalRes?.json?.()
+            if (finalRes?.ok) {
+              setSignals(finalData?.signals ?? [])
+              setHasMore(finalData?.hasMore ?? false)
+            }
+          }
+        } else {
+          throw new Error('Failed to poll Congress.gov')
+        }
+      } else {
+        // Normal fetch (no polling)
+        const params = new URLSearchParams()
+        if (debouncedSearch) params.set('search', debouncedSearch)
+        if (selectedSentiment !== 'all') params.set('sentiment', selectedSentiment)
+        if (selectedType !== 'all') params.set('event_type', selectedType)
+        params.set('limit', String(PAGE_SIZE))
+
+        const res = await fetch(`/api/signals?${params.toString()}`)
+        const data = await res?.json?.()
+
+        if (!res?.ok) throw new Error(data?.error ?? 'Failed to fetch signals')
+        setSignals(data?.signals ?? [])
+        setHasMore(data?.hasMore ?? false)
+      }
     } catch (err: any) {
       console.error('Failed to fetch signals:', err)
       setError(err?.message ?? 'Failed to load signals')
@@ -321,7 +372,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           </div>
           <Button variant="secondary" size="sm" onClick={() => fetchSignals(true, true)} loading={refreshing} disabled={refreshing}>
             <RefreshCw size={14} className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Polling Congress.gov...' : 'Poll Now'}
+            {refreshing ? 'Polling...' : 'Poll Now'}
           </Button>
         </div>
 
@@ -458,9 +509,9 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
           <div className="mb-6 bg-hill-orange/10 border border-hill-orange/30 rounded-xl p-6 text-center">
             <div className="flex items-center justify-center gap-3 mb-3">
               <RefreshCw size={20} className="text-hill-orange animate-spin" />
-              <p className="text-hill-orange font-semibold">Fetching latest signals from Congress.gov...</p>
+              <p className="text-hill-orange font-semibold">Fetching latest signals...</p>
             </div>
-            <p className="text-hill-muted text-sm">Pulling bills, votes, and committee actions then running AI analysis. This can take 30-60 seconds on first load.</p>
+            <p className="text-hill-muted text-sm">Polling Congress.gov and USAspending.gov in parallel, then running AI analysis. This can take 30-60 seconds.</p>
           </div>
         )}
 
@@ -672,7 +723,7 @@ export default function DashboardClient({ userEmail, preferences }: DashboardCli
             </p>
             <div className="flex justify-center gap-4 mt-4">
               {(signals?.length ?? 0) === 0 && selectedSentiment === 'all' && selectedType === 'all' && !debouncedSearch && (
-                <Button onClick={() => fetchSignals(true, true)} loading={refreshing}>Poll Congress.gov</Button>
+                <Button onClick={() => fetchSignals(true, true)} loading={refreshing}>Poll Now</Button>
               )}
               {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch) && (
                 <Button variant="ghost" onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery('') }}>Clear All Filters</Button>

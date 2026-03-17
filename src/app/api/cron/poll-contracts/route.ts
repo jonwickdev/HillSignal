@@ -6,23 +6,36 @@ import { fetchRecentContracts } from '@/lib/usaspending-api'
 import { analyzeContractItem, filterContractsForRelevance } from '@/lib/gemini-analysis'
 import type { RawContractItem } from '@/lib/gemini-analysis'
 import type { Signal } from '@/lib/types'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/cron/poll-contracts
  * Polls USAspending.gov for recent large contract awards,
  * cross-references with existing bill signals, and stores analyzed results.
+ * Auth: cron secret (header or query param) OR authenticated user session.
  */
 export async function GET(request: Request) {
+  // Try cron secret first (header or query param)
   const authHeader = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // Also support ?secret= query param for cron-job.org
-    const url = new URL(request.url)
-    const secretParam = url.searchParams.get('secret')
-    if (process.env.CRON_SECRET && secretParam !== process.env.CRON_SECRET) {
+  const url = new URL(request.url)
+  const secretParam = url.searchParams.get('secret')
+  const cronSecretMatch = process.env.CRON_SECRET && (
+    authHeader === `Bearer ${process.env.CRON_SECRET}` || secretParam === process.env.CRON_SECRET
+  )
+
+  if (!cronSecretMatch) {
+    // Fall back to user session auth (for Poll Now from dashboard)
+    try {
+      const supabase = await createServerSupabaseClient()
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    } catch {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
+
   return runContractPoll()
 }
 
