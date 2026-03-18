@@ -497,16 +497,14 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
       <main className="max-w-6xl mx-auto px-4 py-6">
         {/* Header row — clean and minimal */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-5 gap-3">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-hill-white">Signal Feed</h1>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-hill-white shrink-0">Signal Feed</h1>
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto">
             {/* Date range — inline, always visible */}
-            <div className="flex bg-hill-dark rounded-lg border border-hill-border p-0.5">
+            <div className="flex bg-hill-dark rounded-lg border border-hill-border p-0.5 shrink-0">
               {DATE_PRESETS.filter(p => p.key !== 'custom').map((p) => (
                 <button key={p.key} onClick={() => setDateRange(p.key)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-medium whitespace-nowrap transition-all ${
                     dateRange === p.key
                       ? 'bg-hill-orange text-white'
                       : 'text-hill-muted hover:text-hill-white'
@@ -537,9 +535,9 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
           </div>
         )}
 
-        {/* Stats strip — compact, always visible */}
+        {/* Stats strip — 2x2 on mobile, 4-col on desktop */}
         {!loading && (
-          <div className="grid grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
             <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('all'); setShowFavoritesOnly(false) }}
               className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-orange/40 transition-all text-left">
               <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">This Week</p>
@@ -576,7 +574,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                 <Zap size={14} className="text-hill-orange" />
                 <span className="text-xs font-semibold text-hill-orange uppercase tracking-wider">Top Signals This Week</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {topSignals.map((signal: Signal) => {
                   const sent = sentimentConfig?.[signal?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
                   const isContract = signal.event_type === 'contract_award'
@@ -616,14 +614,14 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
         {/* Search + filter toggle row */}
         <div className="flex items-center gap-2 mb-4">
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-hill-muted" />
             <input
               type="text"
-              placeholder="Search by ticker, company, sector..."
+              placeholder="Search ticker, company, sector..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-hill-dark border border-hill-border rounded-lg pl-9 pr-8 py-2.5 text-sm text-hill-white placeholder:text-hill-muted focus:outline-none focus:border-hill-orange/50 transition-colors"
+              className="w-full bg-hill-dark border border-hill-border rounded-lg pl-9 pr-8 py-2 sm:py-2.5 text-sm text-hill-white placeholder:text-hill-muted focus:outline-none focus:border-hill-orange/50 transition-colors"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-hill-muted hover:text-hill-white">
@@ -632,21 +630,21 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
             )}
           </div>
           {/* View toggle */}
-          <div className="flex bg-hill-dark rounded-lg border border-hill-border p-0.5">
+          <div className="flex bg-hill-dark rounded-lg border border-hill-border p-0.5 shrink-0">
             <button onClick={() => setViewMode('analyzed')}
-              className={`px-2.5 py-2 rounded-md transition-all ${viewMode === 'analyzed' ? 'bg-hill-orange text-white' : 'text-hill-muted hover:text-hill-white'}`}
+              className={`px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-md transition-all ${viewMode === 'analyzed' ? 'bg-hill-orange text-white' : 'text-hill-muted hover:text-hill-white'}`}
               title="Analyzed signals">
               <BarChart3 size={14} />
             </button>
             <button onClick={() => setViewMode('tracker')}
-              className={`px-2.5 py-2 rounded-md transition-all ${viewMode === 'tracker' ? 'bg-hill-orange text-white' : 'text-hill-muted hover:text-hill-white'}`}
+              className={`px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-md transition-all ${viewMode === 'tracker' ? 'bg-hill-orange text-white' : 'text-hill-muted hover:text-hill-white'}`}
               title="All tracked bills">
               <List size={14} />
             </button>
           </div>
           {/* Filter toggle */}
           <button onClick={() => setShowFilters(f => !f)}
-            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg text-sm font-medium transition-all border shrink-0 ${
               showFilters || selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly
                 ? 'bg-hill-orange/10 text-hill-orange border-hill-orange/30'
                 : 'bg-hill-dark text-hill-muted border-hill-border hover:text-hill-white'

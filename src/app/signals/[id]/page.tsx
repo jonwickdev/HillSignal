@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { redirect, notFound } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase/server'
 import SignalDetailClient from './SignalDetailClient'
@@ -47,12 +47,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function SignalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  if (authError || !user) redirect('/login')
-
-  const { data: signal, error } = await supabase
+  // Use admin client so the page is readable by anyone (public, crawlers, LLMs).
+  // Auth is optional — logged-in users get extra features (favorites, dismiss).
+  const admin = createAdminClient()
+  const { data: signal, error } = await admin
     .from('signals')
     .select('*')
     .eq('id', id ?? '')
@@ -60,10 +59,49 @@ export default async function SignalDetailPage({ params }: { params: Promise<{ i
 
   if (error || !signal) notFound()
 
+  // Check if user is logged in (optional — for interactive features)
+  let isAuthenticated = false
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    isAuthenticated = !!user
+  } catch { /* not logged in — that's fine */ }
+
   // Fetch connected signals (bill↔contract cross-links)
   const connectedSignals = await findConnectedSignals(signal)
 
-  return <SignalDetailClient signal={signal} connectedSignals={connectedSignals} />
+  return (
+    <>
+      {/* JSON-LD structured data for SEO and AEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            headline: signal.title,
+            description: signal.summary?.slice(0, 300),
+            datePublished: signal.event_date,
+            dateModified: signal.updated_at || signal.created_at,
+            author: { '@type': 'Organization', name: 'HillSignal', url: 'https://hillsignal.com' },
+            publisher: { '@type': 'Organization', name: 'HillSignal', url: 'https://hillsignal.com', logo: { '@type': 'ImageObject', url: 'https://hillsignal.com/og-image.png' } },
+            mainEntityOfPage: { '@type': 'WebPage', '@id': `https://hillsignal.com/signals/${signal.id}` },
+            about: [
+              ...(signal.affected_sectors ?? []).map((s: string) => ({ '@type': 'Thing', name: s })),
+              ...(signal.tickers ?? []).map((t: string) => ({ '@type': 'FinancialProduct', name: t, tickerSymbol: t })),
+            ],
+            keywords: [
+              signal.event_type === 'contract_award' ? 'government contract' : 'congressional bill',
+              ...(signal.affected_sectors ?? []),
+              ...(signal.tickers ?? []),
+              'congressional activity', 'market intelligence',
+            ].join(', '),
+          }),
+        }}
+      />
+      <SignalDetailClient signal={signal} connectedSignals={connectedSignals} isAuthenticated={isAuthenticated} />
+    </>
+  )
 }
 
 /**

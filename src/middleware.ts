@@ -39,7 +39,9 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protected routes - require authentication
-  const protectedPaths = ['/dashboard', '/checkout', '/success', '/settings', '/signals', '/profile']
+  // Signal detail pages are PUBLIC (read-only) for SEO/sharing/AEO.
+  // Dashboard, settings, profile remain auth-gated.
+  const protectedPaths = ['/dashboard', '/checkout', '/success', '/settings', '/profile']
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )

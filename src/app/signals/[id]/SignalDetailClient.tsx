@@ -1,10 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { Signal } from '@/lib/types'
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText, Link2, DollarSign, FileBarChart } from 'lucide-react'
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText, Link2, DollarSign, FileBarChart, Share2, Check } from 'lucide-react'
 
 /** Fix malformed dollar amounts in titles (e.g., "$10410.5M" → "$10.4B") */
 function fixTitleDollars(title: string): string {
@@ -37,7 +38,7 @@ interface ConnectedSignal extends Signal {
   _connectionScore?: number
 }
 
-export default function SignalDetailClient({ signal, connectedSignals = [] }: { signal: Signal; connectedSignals?: ConnectedSignal[] }) {
+export default function SignalDetailClient({ signal, connectedSignals = [], isAuthenticated = false }: { signal: Signal; connectedSignals?: ConnectedSignal[]; isAuthenticated?: boolean }) {
   const sentiment = sentimentConfig?.[signal?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
   const SentimentIcon = sentiment?.Icon ?? Minus
   const hasAnalysis = !!(signal?.full_analysis && signal.full_analysis.length > 0)
@@ -47,14 +48,39 @@ export default function SignalDetailClient({ signal, connectedSignals = [] }: { 
   const hasImplications = !!(signal?.market_implications && signal.market_implications.length > 0)
   const hasLegislators = (signal?.legislators?.length ?? 0) > 0
 
+  const [copied, setCopied] = useState(false)
+
+  const handleShare = async () => {
+    const url = `https://hillsignal.com/signals/${signal.id}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback
+    }
+  }
+
   return (
     <div className="min-h-screen bg-hill-black">
       <header className="sticky top-0 z-50 bg-hill-black/80 backdrop-blur-md border-b border-hill-border">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="text-xl font-bold text-hill-white">Hill<span className="text-hill-orange">Signal</span></Link>
-          <Link href="/dashboard">
-            <Button variant="ghost" size="sm"><ArrowLeft size={14} className="mr-2" /> Back to Feed</Button>
-          </Link>
+          <Link href={isAuthenticated ? '/dashboard' : '/'} className="text-xl font-bold text-hill-white">Hill<span className="text-hill-orange">Signal</span></Link>
+          <div className="flex items-center gap-2">
+            <button onClick={handleShare}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-hill-muted hover:text-hill-white bg-hill-dark border border-hill-border hover:border-hill-orange/30 transition-all">
+              {copied ? <><Check size={12} className="text-hill-green" /> Copied</> : <><Share2 size={12} /> Share</>}
+            </button>
+            {isAuthenticated ? (
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm"><ArrowLeft size={14} className="mr-2" /> Back to Feed</Button>
+              </Link>
+            ) : (
+              <Link href="/signup">
+                <Button variant="primary" size="sm">Get Full Access</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -330,7 +356,11 @@ export default function SignalDetailClient({ signal, connectedSignals = [] }: { 
               <Button variant="secondary">View on {signal?.event_type === 'contract_award' ? 'USAspending.gov' : 'Congress.gov'} <ExternalLink size={14} className="ml-2" /></Button>
             </a>
           )}
-          <Link href="/dashboard"><Button variant="ghost"><ArrowLeft size={14} className="mr-2" /> Back to Feed</Button></Link>
+          {isAuthenticated ? (
+            <Link href="/dashboard"><Button variant="ghost"><ArrowLeft size={14} className="mr-2" /> Back to Feed</Button></Link>
+          ) : (
+            <Link href="/signup"><Button variant="primary">Get Full Access — Daily AI Analysis</Button></Link>
+          )}
         </div>
       </main>
     </div>

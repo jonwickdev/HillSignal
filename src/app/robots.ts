@@ -5,8 +5,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: '/',
-        disallow: ['/api/', '/dashboard', '/settings', '/profile', '/success'],
+        allow: ['/', '/signals/'],
+        disallow: ['/api/', '/dashboard', '/settings', '/profile', '/success', '/checkout'],
       },
     ],
     sitemap: 'https://hillsignal.com/sitemap.xml',
