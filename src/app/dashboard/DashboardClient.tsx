@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import { createClient } from '@/lib/supabase/client'
 import type { Signal } from '@/lib/types'
-import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search, User, List, BarChart3, Calendar } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search, User, List, BarChart3, Calendar, SlidersHorizontal, DollarSign, Zap, FileText, Landmark } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
   bullish: { color: 'text-hill-green', bg: 'bg-hill-green/10', border: 'border-hill-green/30', label: 'Bullish', Icon: TrendingUp },
@@ -108,17 +108,20 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
   const [selectedType, setSelectedType] = useState<string>('all')
 
   // Date range filter (event_date, not created_at)
-  const [dateRange, setDateRange] = useState<string>('90d') // preset key or 'custom'
+  const [dateRange, setDateRange] = useState<string>('7d') // preset key or 'custom'
   const [customDateFrom, setCustomDateFrom] = useState<string>('')
   const [customDateTo, setCustomDateTo] = useState<string>('')
 
   const DATE_PRESETS: { key: string; label: string; days: number | null }[] = [
-    { key: '7d', label: '7 Days', days: 7 },
+    { key: '7d', label: 'This Week', days: 7 },
     { key: '30d', label: '30 Days', days: 30 },
     { key: '90d', label: '90 Days', days: 90 },
     { key: 'all', label: 'All Time', days: null },
     { key: 'custom', label: 'Custom', days: null },
   ]
+
+  // Filters panel toggle
+  const [showFilters, setShowFilters] = useState(false)
 
   // Compute actual dateFrom/dateTo for API calls
   const getDateParams = useCallback(() => {
@@ -482,42 +485,28 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        {/* Header row — clean and minimal */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-5 gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-hill-white mb-2">Congressional Signal Feed</h1>
-            <p className="text-hill-muted">Real-time intelligence from Congress.gov, analyzed by AI.</p>
+            <h1 className="text-xl md:text-2xl font-bold text-hill-white">Signal Feed</h1>
           </div>
-          <div className="flex items-center gap-3">
-            {/* View mode toggle */}
-            <div className="flex bg-hill-dark rounded-lg border border-hill-border p-1">
-              <button
-                onClick={() => setViewMode('analyzed')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  viewMode === 'analyzed'
-                    ? 'bg-hill-orange text-white'
-                    : 'text-hill-muted hover:text-hill-white'
-                }`}
-              >
-                <BarChart3 size={14} />
-                <span className="hidden sm:inline">Analyzed</span>
-              </button>
-              <button
-                onClick={() => setViewMode('tracker')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  viewMode === 'tracker'
-                    ? 'bg-hill-orange text-white'
-                    : 'text-hill-muted hover:text-hill-white'
-                }`}
-              >
-                <List size={14} />
-                <span className="hidden sm:inline">Tracker</span>
-              </button>
+          <div className="flex items-center gap-2">
+            {/* Date range — inline, always visible */}
+            <div className="flex bg-hill-dark rounded-lg border border-hill-border p-0.5">
+              {DATE_PRESETS.filter(p => p.key !== 'custom').map((p) => (
+                <button key={p.key} onClick={() => setDateRange(p.key)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
+                    dateRange === p.key
+                      ? 'bg-hill-orange text-white'
+                      : 'text-hill-muted hover:text-hill-white'
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
             </div>
             <Button variant="secondary" size="sm" onClick={() => fetchSignals(true, true)} loading={refreshing} disabled={refreshing}>
-              <RefreshCw size={14} className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Polling...' : 'Poll Now'}
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             </Button>
           </div>
         </div>
@@ -538,158 +527,209 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
           </div>
         )}
 
-        {/* Search bar */}
-        <div className="relative mb-6">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-hill-muted" />
-          <input
-            type="text"
-            placeholder="Search signals by title, ticker, sector, keyword..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-hill-dark border border-hill-border rounded-lg pl-11 pr-4 py-3 text-sm text-hill-white placeholder:text-hill-muted focus:outline-none focus:border-hill-orange/50 transition-colors"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-hill-muted hover:text-hill-white">
-              <X size={14} />
+        {/* Stats strip — compact, always visible */}
+        {!loading && (
+          <div className="grid grid-cols-4 gap-3 mb-5">
+            <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('all'); setShowFavoritesOnly(false) }}
+              className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-orange/40 transition-all text-left">
+              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">This Week</p>
+              <p className="text-xl font-bold text-hill-white font-mono">{stats.thisWeekSignals.toLocaleString()}</p>
             </button>
-          )}
+            <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('bullish'); setShowFavoritesOnly(false) }}
+              className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-green/40 transition-all text-left">
+              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">Bullish</p>
+              <p className="text-xl font-bold text-hill-green font-mono">{visibleSignals.filter(s => s.sentiment === 'bullish').length}</p>
+            </button>
+            <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('bearish'); setShowFavoritesOnly(false) }}
+              className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-red/40 transition-all text-left">
+              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">Bearish</p>
+              <p className="text-xl font-bold text-hill-red font-mono">{visibleSignals.filter(s => s.sentiment === 'bearish').length}</p>
+            </button>
+            <button onClick={() => { setSelectedType(selectedType === 'contract_award' ? 'all' : 'contract_award') }}
+              className={`bg-hill-dark rounded-lg p-3 border transition-all text-left ${selectedType === 'contract_award' ? 'border-hill-blue ring-1 ring-hill-blue/30' : 'border-hill-border hover:border-hill-blue/40'}`}>
+              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">Contracts</p>
+              <p className="text-xl font-bold text-hill-blue font-mono">{visibleSignals.filter(s => s.event_type === 'contract_award').length}</p>
+            </button>
+          </div>
+        )}
+
+        {/* Top Signals This Week — hero strip, only in analyzed view */}
+        {!loading && !error && viewMode === 'analyzed' && dateRange === '7d' && (() => {
+          const topSignals = [...visibleSignals]
+            .filter(s => (s.impact_score ?? 0) >= 6)
+            .sort((a, b) => (b.impact_score ?? 0) - (a.impact_score ?? 0))
+            .slice(0, 3)
+          if (topSignals.length === 0) return null
+          return (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap size={14} className="text-hill-orange" />
+                <span className="text-xs font-semibold text-hill-orange uppercase tracking-wider">Top Signals This Week</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {topSignals.map((signal: Signal) => {
+                  const sent = sentimentConfig?.[signal?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
+                  const isContract = signal.event_type === 'contract_award'
+                  const rawAmount = isContract && signal.raw_data?.total_obligation ? Number(signal.raw_data.total_obligation) : null
+                  return (
+                    <Link key={signal.id} href={`/signals/${signal.id}`}
+                      className={`bg-hill-dark rounded-lg p-4 border transition-all hover:border-hill-orange/50 group ${
+                        isContract ? 'border-l-2 border-l-hill-blue border-hill-border' : 'border-hill-border'
+                      }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {isContract ? (
+                          <span className="px-1.5 py-0.5 bg-hill-blue/15 text-hill-blue text-[10px] font-bold rounded uppercase">Contract</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 bg-hill-gray text-hill-muted text-[10px] font-bold rounded uppercase">Bill</span>
+                        )}
+                        <span className={`text-[10px] font-bold uppercase ${sent?.color ?? ''}`}>{sent?.label ?? 'Neutral'}</span>
+                        {rawAmount && rawAmount > 0 && (
+                          <span className="ml-auto text-xs font-mono font-bold text-hill-green">{fixTitleDollars(`$${(rawAmount / 1e6).toFixed(1)}M`)}</span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium text-hill-white leading-snug line-clamp-2 group-hover:text-hill-orange transition-colors">
+                        {fixTitleDollars(signal.title ?? '')}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {(signal.tickers ?? []).slice(0, 3).map((t: string) => (
+                          <span key={t} className="text-[11px] font-mono text-hill-orange">{t}</span>
+                        ))}
+                        <span className="ml-auto text-[11px] font-mono text-hill-muted">{signal.impact_score}/10</span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Search + filter toggle row */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-hill-muted" />
+            <input
+              type="text"
+              placeholder="Search by ticker, company, sector..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-hill-dark border border-hill-border rounded-lg pl-9 pr-8 py-2.5 text-sm text-hill-white placeholder:text-hill-muted focus:outline-none focus:border-hill-orange/50 transition-colors"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-hill-muted hover:text-hill-white">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          {/* View toggle */}
+          <div className="flex bg-hill-dark rounded-lg border border-hill-border p-0.5">
+            <button onClick={() => setViewMode('analyzed')}
+              className={`px-2.5 py-2 rounded-md transition-all ${viewMode === 'analyzed' ? 'bg-hill-orange text-white' : 'text-hill-muted hover:text-hill-white'}`}
+              title="Analyzed signals">
+              <BarChart3 size={14} />
+            </button>
+            <button onClick={() => setViewMode('tracker')}
+              className={`px-2.5 py-2 rounded-md transition-all ${viewMode === 'tracker' ? 'bg-hill-orange text-white' : 'text-hill-muted hover:text-hill-white'}`}
+              title="All tracked bills">
+              <List size={14} />
+            </button>
+          </div>
+          {/* Filter toggle */}
+          <button onClick={() => setShowFilters(f => !f)}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${
+              showFilters || selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly
+                ? 'bg-hill-orange/10 text-hill-orange border-hill-orange/30'
+                : 'bg-hill-dark text-hill-muted border-hill-border hover:text-hill-white'
+            }`}>
+            <SlidersHorizontal size={14} />
+            <span className="hidden sm:inline">Filters</span>
+          </button>
         </div>
 
-        {/* Filters */}
-        <div className="mb-6 space-y-3">
-          {/* Row 1: Sentiment + Type + Favorites */}
-          <div className="flex flex-wrap items-center gap-2">
-            {(['all', 'bullish', 'bearish', 'neutral'] as const).map((s) => {
-              const conf = s !== 'all' ? sentimentConfig[s] : null
-              const isActive = selectedSentiment === s
-              return (
-                <button key={s} onClick={() => setSelectedSentiment(s)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
-                    isActive
-                      ? s === 'all' ? 'bg-hill-orange text-white' : `${conf?.bg ?? ''} ${conf?.color ?? ''} border ${conf?.border ?? ''}`
-                      : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+        {/* Collapsible filter panel */}
+        {showFilters && (
+          <div className="mb-5 bg-hill-dark/50 rounded-lg border border-hill-border p-4 space-y-3">
+            {/* Sentiment + Type */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] text-hill-muted uppercase tracking-wider w-16 shrink-0">Sentiment</span>
+              {(['all', 'bullish', 'bearish', 'neutral'] as const).map((s) => {
+                const conf = s !== 'all' ? sentimentConfig[s] : null
+                const isActive = selectedSentiment === s
+                return (
+                  <button key={s} onClick={() => setSelectedSentiment(s)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${
+                      isActive
+                        ? s === 'all' ? 'bg-hill-orange text-white' : `${conf?.bg ?? ''} ${conf?.color ?? ''} border ${conf?.border ?? ''}`
+                        : 'bg-hill-gray/50 text-hill-muted hover:text-hill-white'
+                    }`}>
+                    {conf && <conf.Icon size={11} />}
+                    {s === 'all' ? 'All' : conf?.label ?? s}
+                  </button>
+                )
+              })}
+              <span className="w-px h-5 bg-hill-border" />
+              <span className="text-[10px] text-hill-muted uppercase tracking-wider">Type</span>
+              {(['all', ...eventTypes] as const).map((t) => (
+                <button key={t} onClick={() => setSelectedType(t)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
+                    selectedType === t ? 'bg-hill-orange text-white' : 'bg-hill-gray/50 text-hill-muted hover:text-hill-white'
                   }`}>
-                  {conf && <conf.Icon size={13} />}
-                  {s === 'all' ? 'All Sentiment' : conf?.label ?? s}
-                </button>
-              )
-            })}
-
-            <span className="w-px h-6 bg-hill-border hidden sm:block" />
-
-            {(['all', ...eventTypes] as const).map((t) => (
-              <button key={t} onClick={() => setSelectedType(t)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                  selectedType === t
-                    ? 'bg-hill-orange text-white'
-                    : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
-                }`}>
-                {t === 'all' ? 'All Types' : formatEventType(t)}
-              </button>
-            ))}
-
-            <span className="w-px h-6 bg-hill-border hidden sm:block" />
-
-            <button
-              onClick={() => setShowFavoritesOnly(prev => !prev)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                showFavoritesOnly
-                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
-                  : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
-              }`}>
-              <Star size={14} className={showFavoritesOnly ? 'fill-yellow-400' : ''} />
-              {showFavoritesOnly ? 'Showing Favorites' : 'Favorites'}
-            </button>
-          </div>
-
-          {/* Row 2: Sector pills — always show full list */}
-          <div className="overflow-x-auto">
-            <div className="flex gap-2 pb-1">
-              {sectors.map((sector: string) => (
-                <button key={sector} onClick={() => setSelectedSector(sector)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                    selectedSector === sector
-                      ? 'bg-hill-orange text-white'
-                      : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
-                  }`}>
-                  {sector === 'all' ? 'All Sectors' : sector}
+                  {t === 'all' ? 'All' : formatEventType(t)}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Row 3: Date range pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Calendar size={14} className="text-hill-muted" />
-            {DATE_PRESETS.map((p) => (
-              <button key={p.key} onClick={() => setDateRange(p.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                  dateRange === p.key
-                    ? 'bg-hill-orange text-white'
-                    : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+              <span className="w-px h-5 bg-hill-border" />
+              <button onClick={() => setShowFavoritesOnly(prev => !prev)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  showFavoritesOnly ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40' : 'bg-hill-gray/50 text-hill-muted hover:text-hill-white'
                 }`}>
-                {p.label}
+                <Star size={11} className={showFavoritesOnly ? 'fill-yellow-400' : ''} />
+                Favorites
               </button>
-            ))}
-            {dateRange === 'custom' && (
-              <div className="flex items-center gap-2 ml-2">
-                <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)}
-                  className="bg-hill-gray border border-hill-border text-hill-white text-xs rounded-lg px-2 py-1.5 focus:border-hill-orange focus:outline-none" />
-                <span className="text-hill-muted text-xs">to</span>
-                <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)}
-                  className="bg-hill-gray border border-hill-border text-hill-white text-xs rounded-lg px-2 py-1.5 focus:border-hill-orange focus:outline-none" />
+            </div>
+
+            {/* Sectors */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] text-hill-muted uppercase tracking-wider w-16 shrink-0">Sector</span>
+              <div className="flex flex-wrap gap-1.5">
+                {sectors.map((sector: string) => (
+                  <button key={sector} onClick={() => setSelectedSector(sector)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all ${
+                      selectedSector === sector ? 'bg-hill-orange text-white' : 'bg-hill-gray/50 text-hill-muted hover:text-hill-white'
+                    }`}>
+                    {sector === 'all' ? 'All' : sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Active filter summary */}
+            {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch) && (
+              <div className="flex items-center gap-2 pt-2 border-t border-hill-border">
+                <span className="text-[10px] text-hill-muted">Active:</span>
+                {selectedSentiment !== 'all' && (
+                  <span className="bg-hill-gray px-2 py-0.5 rounded text-xs text-hill-white flex items-center gap-1">
+                    {sentimentConfig[selectedSentiment]?.label ?? selectedSentiment}
+                    <button onClick={() => setSelectedSentiment('all')}><X size={10} className="text-hill-muted hover:text-hill-white" /></button>
+                  </span>
+                )}
+                {selectedType !== 'all' && (
+                  <span className="bg-hill-gray px-2 py-0.5 rounded text-xs text-hill-white flex items-center gap-1">
+                    {formatEventType(selectedType)}
+                    <button onClick={() => setSelectedType('all')}><X size={10} className="text-hill-muted hover:text-hill-white" /></button>
+                  </span>
+                )}
+                {selectedSector !== 'all' && (
+                  <span className="bg-hill-gray px-2 py-0.5 rounded text-xs text-hill-white flex items-center gap-1">
+                    {selectedSector}
+                    <button onClick={() => setSelectedSector('all')}><X size={10} className="text-hill-muted hover:text-hill-white" /></button>
+                  </span>
+                )}
+                <button onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery(''); setDateRange('7d'); setCustomDateFrom(''); setCustomDateTo('') }}
+                  className="text-hill-orange hover:text-hill-orange/80 text-xs ml-auto">Clear all</button>
               </div>
             )}
           </div>
-
-          {/* Active filter summary */}
-          {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch || dateRange !== '90d') && (
-            <div className="flex items-center gap-2 text-xs text-hill-muted">
-              <span>Active filters:</span>
-              {selectedSentiment !== 'all' && (
-                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
-                  {sentimentConfig[selectedSentiment]?.label ?? selectedSentiment}
-                  <button onClick={() => setSelectedSentiment('all')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
-                </span>
-              )}
-              {selectedType !== 'all' && (
-                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
-                  {formatEventType(selectedType)}
-                  <button onClick={() => setSelectedType('all')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
-                </span>
-              )}
-              {selectedSector !== 'all' && (
-                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
-                  {selectedSector}
-                  <button onClick={() => setSelectedSector('all')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
-                </span>
-              )}
-              {showFavoritesOnly && (
-                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
-                  Favorites only
-                  <button onClick={() => setShowFavoritesOnly(false)} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
-                </span>
-              )}
-              {debouncedSearch && (
-                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
-                  &ldquo;{debouncedSearch}&rdquo;
-                  <button onClick={() => setSearchQuery('')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
-                </span>
-              )}
-              {dateRange !== '90d' && (
-                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
-                  {dateRange === 'custom' ? `${customDateFrom || '…'} → ${customDateTo || '…'}` : DATE_PRESETS.find(p => p.key === dateRange)?.label ?? dateRange}
-                  <button onClick={() => setDateRange('90d')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
-                </span>
-              )}
-              <button
-                onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery(''); setDateRange('90d'); setCustomDateFrom(''); setCustomDateTo('') }}
-                className="text-hill-orange hover:text-hill-orange/80 ml-1">
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Polling banner */}
         {polling && !loading && (
@@ -799,110 +839,110 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
             {/* ANALYZED VIEW — full cards */}
             {viewMode === 'analyzed' && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {(visibleSignals ?? []).map((signal: Signal) => {
                   const sentiment = sentimentConfig?.[signal?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
                   const SentimentIcon = sentiment?.Icon ?? Minus
                   const isExpanded = expandedId === signal?.id
                   const isFavorited = favorites.has(signal.id)
+                  const isContract = signal?.event_type === 'contract_award'
+                  const rawAmount = isContract && signal.raw_data?.total_obligation ? Number(signal.raw_data.total_obligation) : null
+                  const recipient = isContract ? (signal.raw_data?.recipient_name ?? null) : null
 
                   return (
                     <div key={signal?.id} className={`bg-hill-dark rounded-xl border transition-all duration-200 overflow-hidden ${
-                      isFavorited ? 'border-yellow-500/40 ring-1 ring-yellow-500/20' : 'border-hill-border hover:border-hill-border/80'
+                      isFavorited ? 'border-yellow-500/40 ring-1 ring-yellow-500/20'
+                        : isContract ? 'border-l-2 border-l-hill-blue border-hill-border'
+                        : 'border-hill-border hover:border-hill-border/80'
                     }`}>
-                      <div className="p-6">
-                        {/* Header row */}
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 text-xs text-hill-muted font-mono mb-2">
-                              <span className="px-2 py-0.5 bg-hill-gray rounded">{formatEventType(signal?.event_type ?? 'signal')}</span>
-                              {signal?.committee && <span>{signal.committee}</span>}
-                              <span>&bull;</span>
-                              <span>{signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                              {signal?.bill_number && (
-                                <span className="text-hill-orange">{signal.bill_number}</span>
+                      <div className="p-5">
+                        {/* Row 1: Type badge + meta + actions */}
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              {isContract ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-hill-blue/15 text-hill-blue text-[10px] font-bold rounded uppercase">
+                                  <Landmark size={10} /> Contract
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-hill-gray text-hill-muted text-[10px] font-bold rounded uppercase">
+                                  <FileText size={10} /> Bill
+                                </span>
                               )}
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${sentiment?.bg ?? ''} ${sentiment?.color ?? ''}`}>
+                                <SentimentIcon size={10} />
+                                {sentiment?.label ?? 'Neutral'}
+                              </span>
+                              {rawAmount && rawAmount > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-hill-green/10 text-hill-green text-[11px] font-bold font-mono rounded">
+                                  <DollarSign size={10} />
+                                  {fixTitleDollars(`$${(rawAmount / 1e6).toFixed(1)}M`).replace('$', '')}
+                                </span>
+                              )}
+                              {signal?.bill_number && (
+                                <span className="text-[11px] text-hill-orange font-mono">{signal.bill_number}</span>
+                              )}
+                              <span className="text-[11px] text-hill-muted font-mono">
+                                {signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                              </span>
                             </div>
-                            <Link href={`/signals/${signal?.id ?? ''}`} className="hover:underline">
-                              <h2 className="text-lg font-semibold text-hill-white leading-tight">{signal?.title ?? 'Untitled'}</h2>
+                            <Link href={`/signals/${signal?.id ?? ''}`} className="hover:text-hill-orange transition-colors">
+                              <h2 className="text-[15px] font-semibold text-hill-white leading-snug">{fixTitleDollars(signal?.title ?? 'Untitled')}</h2>
                             </Link>
-                          </div>
-                          {/* Action buttons + sentiment */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => toggleAction(signal.id, 'favorite')}
-                              disabled={actionLoading === `${signal.id}-favorite`}
-                              className={`p-2 rounded-lg transition-all ${
-                                isFavorited
-                                  ? 'text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20'
-                                  : 'text-hill-muted hover:text-yellow-400 hover:bg-hill-gray'
-                              }`}
-                              title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-                            >
-                              <Star size={16} className={isFavorited ? 'fill-yellow-400' : ''} />
-                            </button>
-                            <button
-                              onClick={() => toggleAction(signal.id, 'dismissed')}
-                              disabled={actionLoading === `${signal.id}-dismissed`}
-                              className="p-2 rounded-lg text-hill-muted hover:text-hill-red hover:bg-hill-red/10 transition-all"
-                              title="Dismiss signal"
-                            >
-                              <X size={16} />
-                            </button>
-                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded border text-sm font-mono ${sentiment?.bg ?? ''} ${sentiment?.border ?? ''} ${sentiment?.color ?? ''}`}>
-                              <SentimentIcon size={14} />
-                              {sentiment?.label ?? 'Neutral'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Tickers & sectors */}
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {(signal?.tickers ?? [])?.map?.((ticker: string) => (
-                            <span key={ticker} className="bg-hill-gray px-3 py-1 rounded text-sm font-mono text-hill-orange">{ticker}</span>
-                          ))}
-                          {(signal?.affected_sectors ?? [])?.map?.((sector: string) => (
-                            <span key={sector} className="bg-hill-border px-3 py-1 rounded text-sm text-hill-muted">{sector}</span>
-                          ))}
-                        </div>
-
-                        {/* Summary */}
-                        <p className="text-hill-text text-sm leading-relaxed mb-4">{signal?.summary ?? ''}</p>
-
-                        {/* Footer - Impact + expand */}
-                        <div className="flex items-center justify-between pt-4 border-t border-hill-border">
-                          <div className="flex items-center gap-2 relative">
-                            <span className="text-xs text-hill-muted">Market Impact</span>
-                            <button onClick={() => setImpactTooltip(impactTooltip === signal?.id ? null : signal?.id ?? null)}
-                              className="text-hill-muted hover:text-hill-white"><Info size={12} /></button>
-                            {impactTooltip === signal?.id && (
-                              <div className="absolute bottom-full left-0 mb-2 bg-hill-gray border border-hill-border rounded-lg p-3 text-xs text-hill-text w-64 z-10 shadow-xl">
-                                <p className="font-semibold text-hill-white mb-1">Impact Score: {signal?.impact_score ?? 0}/10</p>
-                                <p>1-3: Minimal impact | 4-6: Moderate sector | 7-8: Significant | 9-10: Major market event</p>
-                              </div>
+                            {recipient && (
+                              <p className="text-xs text-hill-muted mt-1">{recipient}</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-0.5">
+                          {/* Actions — compact */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => toggleAction(signal.id, 'favorite')} disabled={actionLoading === `${signal.id}-favorite`}
+                              className={`p-1.5 rounded transition-all ${isFavorited ? 'text-yellow-400' : 'text-hill-muted hover:text-yellow-400'}`}
+                              title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}>
+                              <Star size={14} className={isFavorited ? 'fill-yellow-400' : ''} />
+                            </button>
+                            <button onClick={() => toggleAction(signal.id, 'dismissed')} disabled={actionLoading === `${signal.id}-dismissed`}
+                              className="p-1.5 rounded text-hill-muted hover:text-hill-red transition-all" title="Dismiss signal">
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Tickers & sectors — compact */}
+                        {((signal?.tickers?.length ?? 0) > 0 || (signal?.affected_sectors?.length ?? 0) > 0) && (
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {(signal?.tickers ?? [])?.map?.((ticker: string) => (
+                              <span key={ticker} className="bg-hill-gray px-2 py-0.5 rounded text-xs font-mono text-hill-orange font-medium">{ticker}</span>
+                            ))}
+                            {(signal?.affected_sectors ?? [])?.map?.((sector: string) => (
+                              <span key={sector} className="bg-hill-border/50 px-2 py-0.5 rounded text-[11px] text-hill-muted">{sector}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Summary */}
+                        <p className="text-hill-text text-sm leading-relaxed mb-3">{signal?.summary ?? ''}</p>
+
+                        {/* Footer: impact bar + expand */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-px">
                               {[...(Array(10) ?? [])]?.map?.((_: any, i: number) => (
-                                <div key={i} className={`w-2 h-5 rounded-sm transition-all ${
+                                <div key={i} className={`w-1.5 h-4 rounded-sm ${
                                   i < (signal?.impact_score ?? 0)
                                     ? (signal?.impact_score ?? 0) >= 7 ? 'bg-hill-orange' : (signal?.impact_score ?? 0) >= 4 ? 'bg-hill-green' : 'bg-hill-blue'
-                                    : 'bg-hill-gray'
+                                    : 'bg-hill-gray/50'
                                 }`} />
                               ))}
                             </div>
-                            <span className="font-mono text-hill-white font-semibold">{signal?.impact_score ?? 0}/10</span>
+                            <span className="text-xs font-mono text-hill-muted">{signal?.impact_score ?? 0}/10</span>
                           </div>
+                          {(signal?.full_analysis || (signal?.key_takeaways?.length ?? 0) > 0) && (
+                            <button onClick={() => setExpandedId(isExpanded ? null : signal?.id ?? null)}
+                              className="flex items-center gap-1 text-xs text-hill-orange hover:text-hill-orange/80 transition-colors">
+                              {isExpanded ? <><ChevronUp size={12} /> Hide</> : <><ChevronDown size={12} /> Analysis</>}
+                            </button>
+                          )}
                         </div>
-
-                        {/* Expand button — only if analysis exists */}
-                        {(signal?.full_analysis || (signal?.key_takeaways?.length ?? 0) > 0) && (
-                          <button onClick={() => setExpandedId(isExpanded ? null : signal?.id ?? null)}
-                            className="mt-4 flex items-center gap-2 text-sm text-hill-orange hover:text-hill-orange/80 transition-colors w-full justify-center py-2">
-                            {isExpanded ? <><ChevronUp size={16} /> Hide Analysis</> : <><ChevronDown size={16} /> Show Full Analysis</>}
-                          </button>
-                        )}
                       </div>
 
                       {/* Expanded content */}
@@ -986,36 +1026,19 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
               {(signals?.length ?? 0) === 0 && selectedSentiment === 'all' && selectedType === 'all' && !debouncedSearch && (
                 <Button onClick={() => fetchSignals(true, true)} loading={refreshing}>Poll Now</Button>
               )}
-              {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch || dateRange !== '90d') && (
-                <Button variant="ghost" onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery(''); setDateRange('90d'); setCustomDateFrom(''); setCustomDateTo('') }}>Clear All Filters</Button>
+              {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch || dateRange !== '7d') && (
+                <Button variant="ghost" onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery(''); setDateRange('7d'); setCustomDateFrom(''); setCustomDateTo('') }}>Clear All Filters</Button>
               )}
             </div>
           </Card>
         )}
 
-        {/* Stats — real database counts */}
-        {!loading && (
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button onClick={() => { setViewMode('tracker'); setSelectedSentiment('all'); setShowFavoritesOnly(false) }}
-              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all ${viewMode === 'tracker' && selectedSentiment === 'all' && !showFavoritesOnly ? 'border-hill-orange ring-1 ring-hill-orange/30' : 'border-hill-border hover:border-hill-border/80'}`}>
-              <p className="text-hill-muted text-xs mb-1">Total Tracked</p>
-              <p className="text-2xl font-bold text-hill-white font-mono">{stats.totalSignals.toLocaleString()}</p>
-            </button>
-            <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('all'); setShowFavoritesOnly(false) }}
-              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all ${viewMode === 'analyzed' && selectedSentiment === 'all' && !showFavoritesOnly ? 'border-hill-green ring-1 ring-hill-green/30' : 'border-hill-border hover:border-hill-border/80'}`}>
-              <p className="text-hill-muted text-xs mb-1">AI Analyzed</p>
-              <p className="text-2xl font-bold text-hill-green font-mono">{stats.analyzedSignals.toLocaleString()}</p>
-            </button>
-            <button onClick={() => { setSelectedSentiment('all'); setShowFavoritesOnly(false) }}
-              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all border-hill-border hover:border-hill-border/80`}>
-              <p className="text-hill-muted text-xs mb-1">This Week</p>
-              <p className="text-2xl font-bold text-hill-blue font-mono">{stats.thisWeekSignals.toLocaleString()}</p>
-            </button>
-            <button onClick={() => { setShowFavoritesOnly(true); setSelectedSentiment('all') }}
-              className={`bg-hill-dark rounded-lg p-4 border text-left transition-all ${showFavoritesOnly ? 'border-yellow-500 ring-1 ring-yellow-500/30' : 'border-hill-border hover:border-hill-border/80'}`}>
-              <p className="text-hill-muted text-xs mb-1">Favorites</p>
-              <p className="text-2xl font-bold text-yellow-400 font-mono">{favorites.size}</p>
-            </button>
+        {/* Bottom DB count — subtle */}
+        {!loading && stats.totalSignals > 0 && (
+          <div className="mt-6 text-center">
+            <p className="text-[11px] text-hill-muted/60">
+              {stats.totalSignals.toLocaleString()} signals tracked · {stats.analyzedSignals.toLocaleString()} AI analyzed
+            </p>
           </div>
         )}
       </main>
