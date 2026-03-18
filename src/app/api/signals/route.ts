@@ -168,11 +168,14 @@ export async function GET(request: Request) {
     }
 
     // Date range filtering:
-    // - dateFrom/dateTo: user-selected range (filters on event_date for precision)
-    // - Default: 90-day window on created_at (when signal was added to HillSignal)
-    //   This ensures backfilled historical contracts appear (their event_date may be old)
+    // - dateCol: which column to filter on — 'created_at' (default) or 'event_date'
+    //   Presets (7d, 30d, 90d) should use created_at so backfilled contracts appear.
+    //   Custom ranges use event_date for precise research.
+    // - dateFrom/dateTo: the actual date boundaries
+    // - Default (no params): 90-day window on created_at
     const dateFrom = searchParams?.get?.('dateFrom')
     const dateTo = searchParams?.get?.('dateTo')
+    const dateCol = searchParams?.get?.('dateCol') ?? 'created_at'
     const defaultFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
 
     let query = readClient
@@ -188,18 +191,17 @@ export async function GET(request: Request) {
 
     // Apply date window
     if (dateFrom || dateTo) {
-      // User explicitly set a date range — filter on event_date (the actual event date)
+      const col = dateCol === 'event_date' ? 'event_date' : 'created_at'
       if (dateFrom) {
-        query = query.gte('event_date', dateFrom)
+        query = query.gte(col, dateFrom)
       }
       if (dateTo) {
         const endDate = new Date(dateTo)
         endDate.setDate(endDate.getDate() + 1)
-        query = query.lt('event_date', endDate.toISOString())
+        query = query.lt(col, endDate.toISOString())
       }
     } else {
       // Default: show signals added in the last 90 days (by created_at)
-      // This keeps backfilled contracts visible even if their event_date is old
       query = query.gte('created_at', defaultFrom)
     }
 

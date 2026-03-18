@@ -123,20 +123,22 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
   // Filters panel toggle
   const [showFilters, setShowFilters] = useState(false)
 
-  // Compute actual dateFrom/dateTo for API calls
+  // Compute actual dateFrom/dateTo/dateCol for API calls
+  // Presets use created_at (when signal was added) so backfilled contracts appear.
+  // Custom ranges use event_date for precise research.
   const getDateParams = useCallback(() => {
     if (dateRange === 'custom') {
-      return { dateFrom: customDateFrom || undefined, dateTo: customDateTo || undefined }
+      return { dateFrom: customDateFrom || undefined, dateTo: customDateTo || undefined, dateCol: 'event_date' as const }
     }
     if (dateRange === 'all') {
-      return { dateFrom: '1900-01-01', dateTo: undefined }
+      return { dateFrom: '1900-01-01', dateTo: undefined, dateCol: 'created_at' as const }
     }
     const preset = DATE_PRESETS.find(p => p.key === dateRange)
     if (preset?.days) {
       const from = new Date(Date.now() - preset.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      return { dateFrom: from, dateTo: undefined }
+      return { dateFrom: from, dateTo: undefined, dateCol: 'created_at' as const }
     }
-    return { dateFrom: undefined, dateTo: undefined }
+    return { dateFrom: undefined, dateTo: undefined, dateCol: 'created_at' as const }
   }, [dateRange, customDateFrom, customDateTo])
 
   const pageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE
@@ -191,11 +193,12 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
       const currentPageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE
 
-      // Helper: append dateFrom/dateTo to any URLSearchParams
+      // Helper: append dateFrom/dateTo/dateCol to any URLSearchParams
       const applyDate = (p: URLSearchParams) => {
-        const { dateFrom, dateTo } = getDateParams()
+        const { dateFrom, dateTo, dateCol } = getDateParams()
         if (dateFrom) p.set('dateFrom', dateFrom)
         if (dateTo) p.set('dateTo', dateTo)
+        if (dateCol) p.set('dateCol', dateCol)
       }
 
       if (refresh) {
@@ -309,9 +312,10 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (selectedSentiment !== 'all') params.set('sentiment', selectedSentiment)
       if (selectedType !== 'all') params.set('event_type', selectedType)
-      const { dateFrom, dateTo } = getDateParams()
+      const { dateFrom, dateTo, dateCol } = getDateParams()
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
+      if (dateCol) params.set('dateCol', dateCol)
 
       const res = await fetch(`/api/signals?${params.toString()}`)
       const data = await res?.json?.()
@@ -383,6 +387,11 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
         const params = new URLSearchParams()
         params.set('view', viewMode)
         params.set('limit', String(viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE))
+        // Apply default date range (7d on created_at) so initial load matches filter state
+        const initDate = getDateParams()
+        if (initDate.dateFrom) params.set('dateFrom', initDate.dateFrom)
+        if (initDate.dateTo) params.set('dateTo', initDate.dateTo)
+        if (initDate.dateCol) params.set('dateCol', initDate.dateCol)
         const res = await fetch(`/api/signals?${params.toString()}`)
         const data = await res?.json?.()
         if (cancelled) return
@@ -427,7 +436,8 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
     }
     init()
     return () => { cancelled = true }
-  }, [fetchUserActions, fetchMissingFavorites])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchUserActions, fetchMissingFavorites, getDateParams])
 
   const handleSignOut = async () => {
     const supabase = createClient()
