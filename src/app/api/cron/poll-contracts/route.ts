@@ -100,7 +100,7 @@ async function runContractPoll(targetSector?: string) {
     const sectorLimit = targetSector ? 25 : 10
     console.log(`[contracts] Polling USAspending.gov (generic + ${sectorsToFetch.length} sectors${targetSector ? ` [targeted: ${targetSector}]` : ''})...`)
     const [genericResult, sectorResult] = await Promise.allSettled([
-      fetchRecentContracts(sinceDate, 25_000_000, 75),
+      fetchRecentContracts(sinceDate, 25_000_000, 75).then(r => r.items),
       fetchSectorContracts(sectorsToFetch, sinceDate, sectorLimit),
     ])
 

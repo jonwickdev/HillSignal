@@ -6,6 +6,26 @@ import Button from '@/components/ui/Button'
 import type { Signal } from '@/lib/types'
 import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText, Link2, DollarSign, FileBarChart } from 'lucide-react'
 
+/** Fix malformed dollar amounts in titles (e.g., "$10410.5M" → "$10.4B") */
+function fixTitleDollars(title: string): string {
+  return title.replace(/\$[\d,]+(?:\.\d+)?[MBK]/g, (match) => {
+    const suffix = match.slice(-1)
+    const num = parseFloat(match.slice(1, -1).replace(/,/g, ''))
+    if (isNaN(num)) return match
+    const multipliers: Record<string, number> = { K: 1_000, M: 1_000_000, B: 1_000_000_000 }
+    const raw = num * (multipliers[suffix] ?? 1)
+    if (raw >= 1_000_000_000) {
+      const b = raw / 1_000_000_000
+      return `$${b >= 100 ? b.toFixed(0) : b.toFixed(1)}B`
+    }
+    if (raw >= 1_000_000) {
+      const m = raw / 1_000_000
+      return `$${m >= 100 ? m.toFixed(0) : m.toFixed(1)}M`
+    }
+    return match
+  })
+}
+
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
   bullish: { color: 'text-hill-green', bg: 'bg-hill-green/10', border: 'border-hill-green/30', label: 'Bullish', Icon: TrendingUp },
   bearish: { color: 'text-hill-red', bg: 'bg-hill-red/10', border: 'border-hill-red/30', label: 'Bearish', Icon: TrendingDown },
@@ -67,7 +87,7 @@ export default function SignalDetailClient({ signal, connectedSignals = [] }: { 
               <span className="ml-2 px-2 py-0.5 bg-hill-gray text-hill-muted border border-hill-border rounded text-xs">Tracked</span>
             )}
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-hill-white leading-tight mb-4">{signal?.title ?? 'Untitled Signal'}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-hill-white leading-tight mb-4">{fixTitleDollars(signal?.title ?? 'Untitled Signal')}</h1>
           <div className="flex flex-wrap items-center gap-3">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-mono ${sentiment?.bg ?? ''} ${sentiment?.border ?? ''} ${sentiment?.color ?? ''}`}>
               <SentimentIcon size={16} /> {sentiment?.label ?? 'Neutral'}

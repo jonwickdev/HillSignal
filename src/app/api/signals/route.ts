@@ -223,11 +223,12 @@ export async function GET(request: Request) {
       query = query.eq('event_type', eventType)
     }
 
-    // Server-side text search (title, summary, bill_number, event_type)
+    // Server-side text search (title, summary, bill_number, event_type, raw_data for recipient)
     // Note: PostgREST does not support ::text casting in .or() filters,
     // so tickers (jsonb array) must be searched via .cs() or left out.
+    // raw_data->>recipient_name catches contract recipient company names.
     if (search) {
-      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,bill_number.ilike.%${search}%,event_type.ilike.%${search}%`)
+      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,bill_number.ilike.%${search}%,event_type.ilike.%${search}%,raw_data->>recipient_name.ilike.%${search}%`)
     }
 
     const { data, count, error } = await query

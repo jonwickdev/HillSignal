@@ -38,17 +38,19 @@ export async function fetchRecentContracts(
   sinceDate?: string,
   minAmount: number = 25_000_000,
   limit: number = 75,
-  naicsCodes?: string[]
-): Promise<RawContractItem[]> {
+  naicsCodes?: string[],
+  page: number = 1,
+  endDate?: string
+): Promise<{ items: RawContractItem[]; hasMore: boolean }> {
   // Default to 7 days ago
   const since = sinceDate ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  const today = new Date().toISOString().split('T')[0]
+  const end = endDate ?? new Date().toISOString().split('T')[0]
 
   const naicsLabel = naicsCodes?.length ? ` (NAICS: ${naicsCodes.join(',')})` : ''
-  console.log(`[usaspending] Fetching contracts since ${since}, min $${(minAmount / 1_000_000).toFixed(0)}M${naicsLabel}...`)
+  console.log(`[usaspending] Fetching contracts ${since}→${end}, min $${(minAmount / 1_000_000).toFixed(0)}M, page ${page}${naicsLabel}...`)
 
   const filters: any = {
-    time_period: [{ start_date: since, end_date: today }],
+    time_period: [{ start_date: since, end_date: end }],
     award_type_codes: ['A', 'B', 'C', 'D'], // All contract types
     award_amounts: [{ lower_bound: minAmount }],
   }
@@ -74,7 +76,7 @@ export async function fetchRecentContracts(
     sort: 'Award Amount',
     order: 'desc',
     limit,
-    page: 1,
+    page,
   }
 
   try {
@@ -82,7 +84,7 @@ export async function fetchRecentContracts(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
     })
 
     if (!response.ok) {
@@ -92,9 +94,10 @@ export async function fetchRecentContracts(
 
     const data = await response.json()
     const results: any[] = data?.results ?? []
-    console.log(`[usaspending] Got ${results.length} contracts`)
+    const hasNext = data?.page_metadata?.hasNext ?? (results.length >= limit)
+    console.log(`[usaspending] Got ${results.length} contracts (page ${page}, hasMore: ${hasNext})`)
 
-    return results.map((r: any) => ({
+    const items = results.map((r: any) => ({
       award_id: r['Award ID'] ?? '',
       recipient_name: r['Recipient Name'] ?? 'Unknown',
       description: r['Description'] ?? '',
@@ -108,9 +111,10 @@ export async function fetchRecentContracts(
       source_url: `https://www.usaspending.gov/award/${r['generated_internal_id'] ?? ''}`,
       generated_internal_id: r['generated_internal_id'] ?? '',
     }))
+    return { items, hasMore: hasNext }
   } catch (err: any) {
     console.error('[usaspending] Fetch failed:', err?.message)
-    return []
+    return { items: [], hasMore: false }
   }
 }
 
@@ -123,7 +127,8 @@ export async function fetchRecentContracts(
 export async function fetchSectorContracts(
   sectors: string[],
   sinceDate?: string,
-  limitPerSector: number = 15
+  limitPerSector: number = 15,
+  endDate?: string
 ): Promise<RawContractItem[]> {
   const validSectors = sectors.filter(s => SECTOR_NAICS_MAP[s])
   if (validSectors.length === 0) return []
@@ -136,7 +141,8 @@ export async function fetchSectorContracts(
     const chunk = validSectors.slice(i, i + 4)
     const results = await Promise.allSettled(
       chunk.map(sector =>
-        fetchRecentContracts(sinceDate, 10_000_000, limitPerSector, SECTOR_NAICS_MAP[sector])
+        fetchRecentContracts(sinceDate, 10_000_000, limitPerSector, SECTOR_NAICS_MAP[sector], 1, endDate)
+          .then(r => r.items)
       )
     )
     for (const r of results) {

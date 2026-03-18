@@ -38,6 +38,29 @@ function formatEventType(type: string): string {
   return EVENT_TYPE_LABELS[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
+/**
+ * Fix malformed dollar amounts in titles (e.g., "$10410.5M" → "$10.4B").
+ * Catches bad formatting from earlier AI runs without needing a DB migration.
+ */
+function fixTitleDollars(title: string): string {
+  return title.replace(/\$[\d,]+(?:\.\d+)?[MBK]/g, (match) => {
+    const suffix = match.slice(-1)
+    const num = parseFloat(match.slice(1, -1).replace(/,/g, ''))
+    if (isNaN(num)) return match
+    const multipliers: Record<string, number> = { K: 1_000, M: 1_000_000, B: 1_000_000_000 }
+    const raw = num * (multipliers[suffix] ?? 1)
+    if (raw >= 1_000_000_000) {
+      const b = raw / 1_000_000_000
+      return `$${b >= 100 ? b.toFixed(0) : b.toFixed(1)}B`
+    }
+    if (raw >= 1_000_000) {
+      const m = raw / 1_000_000
+      return `$${m >= 100 ? m.toFixed(0) : m.toFixed(1)}M`
+    }
+    return match
+  })
+}
+
 interface DashboardStats {
   totalSignals: number
   analyzedSignals: number
@@ -737,7 +760,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                       </span>
                       {/* Title — clickable */}
                       <Link href={`/signals/${signal.id}`} className="text-sm text-hill-white truncate flex-1 hover:text-hill-orange transition-colors">
-                        {signal.title}
+                        {fixTitleDollars(signal.title ?? '')}
                       </Link>
                       {/* Bill number */}
                       {signal.bill_number && (

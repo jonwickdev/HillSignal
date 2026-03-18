@@ -244,8 +244,13 @@ async function backfillBills() {
 }
 
 /**
- * Backfill contracts: uses poll_state row 'backfill_contracts' to track progress.
- * Each call processes one sector. Tracks which sectors are done.
+ * Backfill contracts: processes ONE sector per call with pagination.
+ * State tracked in poll_state 'backfill_contracts':
+ *   - errors: JSON { completedSectors: string[], currentSector: string|null, currentPage: number }
+ *   - votes_processed: total contracts stored
+ *
+ * 30-day lookback, $10M minimum, all 12 tracked sectors.
+ * Call repeatedly until status === 'complete'.
  */
 async function backfillContracts() {
   const startTime = Date.now()
@@ -262,31 +267,55 @@ async function backfillContracts() {
     backfillState = data
   } catch { /* first call */ }
 
-  const allSectors = Object.keys(SECTOR_NAICS_MAP)
-  const completedSectors: string[] = backfillState?.errors
-    ? JSON.parse(backfillState.errors)
-    : []
-  const remainingSectors = allSectors.filter(s => !completedSectors.includes(s))
-
-  if (remainingSectors.length === 0) {
-    return NextResponse.json({
-      status: 'complete',
-      message: `Contract backfill complete. ${backfillState?.votes_processed ?? 0} signals stored across all sectors.`,
-      total_stored: backfillState?.votes_processed ?? 0,
-    })
+  // Parse state
+  let state: { completedSectors: string[]; currentSector: string | null; currentPage: number } = {
+    completedSectors: [],
+    currentSector: null,
+    currentPage: 1,
+  }
+  if (backfillState?.errors) {
+    try {
+      const parsed = JSON.parse(backfillState.errors)
+      // Handle legacy format (string array)
+      if (Array.isArray(parsed)) {
+        state = { completedSectors: parsed, currentSector: null, currentPage: 1 }
+      } else {
+        state = { ...state, ...parsed }
+      }
+    } catch { /* fresh start */ }
   }
 
-  // Process next 2 sectors
-  const batch = remainingSectors.slice(0, 2)
-  console.log(`[backfill] Contract sectors: ${batch.join(', ')} (${remainingSectors.length} remaining)`)
+  const allSectors = Object.keys(SECTOR_NAICS_MAP)
+  const remainingSectors = allSectors.filter(s => !state.completedSectors.includes(s))
+
+  // If no current sector, pick next
+  if (!state.currentSector) {
+    if (remainingSectors.length === 0) {
+      return NextResponse.json({
+        status: 'complete',
+        message: `Contract backfill complete. ${backfillState?.votes_processed ?? 0} signals stored across all ${allSectors.length} sectors.`,
+        total_stored: backfillState?.votes_processed ?? 0,
+        sectors: allSectors.length,
+      })
+    }
+    state.currentSector = remainingSectors[0]
+    state.currentPage = 1
+  }
+
+  const sector = state.currentSector!
+  const naicsCodes = SECTOR_NAICS_MAP[sector]
+  console.log(`[backfill] Processing sector: ${sector} (page ${state.currentPage})`)
 
   try {
-    // 90-day lookback for contracts
-    const sinceDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // 30-day lookback, $10M minimum
+    const sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const endDate = new Date().toISOString().split('T')[0]
 
-    // Fetch from all batch sectors with lower threshold ($10M)
-    const rawContracts = await fetchSectorContracts(batch, sinceDate, 30)
-    console.log(`[backfill] Fetched ${rawContracts.length} contracts for ${batch.join(', ')}`)
+    // Fetch one page of contracts for this sector (100 per page)
+    const { items: rawContracts, hasMore } = await fetchRecentContracts(
+      sinceDate, 10_000_000, 100, naicsCodes, state.currentPage, endDate
+    )
+    console.log(`[backfill] Fetched ${rawContracts.length} contracts for ${sector} page ${state.currentPage} (hasMore: ${hasMore})`)
 
     let stored = 0
 
@@ -299,7 +328,7 @@ async function backfillContracts() {
         .in('congress_gov_id', contractIds)
       const existingIds = new Set((existing ?? []).map((e: any) => e.congress_gov_id))
       const newContracts = rawContracts.filter(c => !existingIds.has(`contract-${c.generated_internal_id}`))
-      console.log(`[backfill] ${newContracts.length} new contracts`)
+      console.log(`[backfill] ${newContracts.length} new contracts (${existingIds.size} already in DB)`)
 
       if (newContracts.length > 0) {
         // Filter for relevance
@@ -317,11 +346,16 @@ async function backfillContracts() {
 
           const relatedBills: Array<Partial<Signal>> = (billSignals ?? []) as Array<Partial<Signal>>
 
-          // Analyze (max 10 per call)
-          const toAnalyze = relevant.slice(0, 10)
+          // Analyze up to 15 per call (3 at a time for parallelism)
+          const toAnalyze = relevant.slice(0, 15)
           console.log(`[backfill] Analyzing ${toAnalyze.length} contracts...`)
 
           for (let i = 0; i < toAnalyze.length; i += 3) {
+            // Time check: bail if we're approaching 55s
+            if (Date.now() - startTime > 50_000) {
+              console.log(`[backfill] Approaching timeout, saving progress (analyzed ${i}/${toAnalyze.length})`)
+              break
+            }
             const chunk = toAnalyze.slice(i, i + 3)
             const results = await Promise.allSettled(
               chunk.map((contract: RawContractItem) => analyzeContractItem(contract, relatedBills))
@@ -329,7 +363,6 @@ async function backfillContracts() {
             for (const r of results) {
               if (r.status === 'fulfilled' && r.value) {
                 const signal = r.value
-                // Quality gate
                 const score = signal?.impact_score ?? 0
                 const sectors = signal?.affected_sectors ?? []
                 if (score <= 2 && sectors.length === 0) continue
@@ -357,38 +390,50 @@ async function backfillContracts() {
               }
             }
             if (i + 3 < toAnalyze.length) {
-              await new Promise(r => setTimeout(r, 500))
+              await new Promise(r => setTimeout(r, 300))
             }
           }
         }
       }
     }
 
-    // Update state
-    const newCompleted = [...completedSectors, ...batch]
+    // Advance state
     const totalStored = (backfillState?.votes_processed ?? 0) + stored
+    if (hasMore && rawContracts.length > 0) {
+      // More pages in this sector
+      state.currentPage++
+    } else {
+      // Sector complete, move to next
+      state.completedSectors.push(sector)
+      state.currentSector = null
+      state.currentPage = 1
+    }
+
+    const sectorsRemaining = allSectors.filter(s => !state.completedSectors.includes(s))
+    const isComplete = state.currentSector === null && sectorsRemaining.length === 0
 
     await adminClient.from('poll_state').upsert({
       id: 'backfill_contracts',
       last_poll_time: new Date().toISOString(),
-      bills_processed: newCompleted.length,
+      bills_processed: state.completedSectors.length,
       votes_processed: totalStored,
-      errors: JSON.stringify(newCompleted),
+      errors: JSON.stringify(state),
     }, { onConflict: 'id' })
 
-    const isComplete = newCompleted.length >= allSectors.length
     const elapsed = Date.now() - startTime
 
     return NextResponse.json({
       status: isComplete ? 'complete' : 'in_progress',
-      sectors_processed: batch,
-      sectors_remaining: allSectors.filter(s => !newCompleted.includes(s)),
+      current_sector: sector,
+      current_page: hasMore ? state.currentPage : 'done',
+      sectors_completed: state.completedSectors,
+      sectors_remaining: sectorsRemaining.filter(s => s !== state.currentSector),
       batch: { fetched: rawContracts.length, stored },
-      totals: { sectors_done: newCompleted.length, sectors_total: allSectors.length, stored: totalStored },
+      totals: { sectors_done: state.completedSectors.length, sectors_total: allSectors.length, stored: totalStored },
       elapsed_ms: elapsed,
       message: isComplete
-        ? `Contract backfill complete. ${totalStored} signals stored.`
-        : `Processed ${batch.join(', ')}. ${allSectors.length - newCompleted.length} sectors remaining. Call again.`,
+        ? `Contract backfill complete. ${totalStored} signals stored across ${allSectors.length} sectors.`
+        : `${sector} page ${hasMore ? state.currentPage - 1 : state.currentPage}: ${rawContracts.length} fetched, ${stored} stored. Call again to continue.`,
     })
   } catch (error: any) {
     console.error('[backfill] Error:', error)

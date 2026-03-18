@@ -6,6 +6,28 @@
 import type { Signal } from '@/lib/types'
 import type { RawCongressItem } from '@/lib/congress-api'
 
+/**
+ * Format a dollar amount for display.
+ * $10,410,500,000 → "$10.4B"
+ * $250,000,000 → "$250M"
+ * $15,500,000 → "$15.5M"
+ */
+export function formatDollarAmount(amount: number): string {
+  const abs = Math.abs(amount)
+  if (abs >= 1_000_000_000) {
+    const billions = abs / 1_000_000_000
+    return `$${billions >= 100 ? billions.toFixed(0) : billions.toFixed(1)}B`
+  }
+  if (abs >= 1_000_000) {
+    const millions = abs / 1_000_000
+    return `$${millions >= 100 ? millions.toFixed(0) : millions.toFixed(1)}M`
+  }
+  if (abs >= 1_000) {
+    return `$${(abs / 1_000).toFixed(0)}K`
+  }
+  return `$${abs.toFixed(0)}`
+}
+
 export interface RawContractItem {
   award_id: string
   recipient_name: string
@@ -230,7 +252,7 @@ export async function analyzeContractItem(
     billContext = `RELATED BILL SIGNALS (from HillSignal database — use these to connect legislation to this contract):\n${lines}`
   }
 
-  const amountStr = `$${(item.award_amount / 1_000_000).toFixed(1)}M`
+  const amountStr = formatDollarAmount(item.award_amount)
 
   const prompt = CONTRACT_ANALYSIS_PROMPT
     .replace('{recipient}', item.recipient_name ?? 'Unknown')
