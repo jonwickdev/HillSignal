@@ -6,9 +6,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/cron/send-digest?secret=CRON_SECRET
- * Called by cron-job.org to send digest emails.
- * Respects each user's email_frequency + daily_digest preferences.
- * Only includes fully analyzed signals (with AI analysis) — never sends empty shells.
+ * Bloomberg-style digest: 5 daily / 10 weekly, tickers + $ front and center.
+ * Uses created_at (when HillSignal ingested) for time window — not event_date.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -55,22 +54,20 @@ async function sendDigest() {
     return NextResponse.json({ sent: 0, message: 'No eligible users today' })
   }
 
-  // Fetch recent ANALYZED signals based on EVENT DATE (when Congress acted),
-  // NOT created_at (when we ingested). This prevents backfilled historical data
-  // from leaking into user-facing digests.
+  // Fetch recent ANALYZED signals using created_at (when HillSignal ingested).
+  // This ensures newly polled contracts/bills always appear even if their
+  // event_date (award date, introduction date) is older.
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
-  // Use 14-day event_date window (covers weekly users generously)
-  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: recentSignals, error: sigError } = await supabase
     .from('signals')
-    .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date, created_at, full_analysis')
-    .gte('event_date', fourteenDaysAgo)          // Congressional activity in last 14 days
-    .not('full_analysis', 'is', null)            // Must have AI analysis
-    .gt('impact_score', 3)                       // Must have real impact
+    .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date, created_at, full_analysis, raw_data')
+    .gte('created_at', sevenDaysAgo)              // Ingested in last 7 days
+    .not('full_analysis', 'is', null)             // Must have AI analysis
+    .gt('impact_score', 3)                        // Must have real impact
     .order('impact_score', { ascending: false })
-    .limit(100)
+    .limit(50)
 
   if (sigError) {
     console.error('Failed to fetch signals:', sigError)
@@ -112,11 +109,11 @@ async function sendDigest() {
 
     const isWeekly = pref.email_frequency === 'weekly'
     const cutoff = isWeekly ? sevenDaysAgo : oneDayAgo
+    const maxSignals = isWeekly ? 10 : 5
 
-    // Filter signals for this user's time window + sector preferences
-    // Use event_date (when Congress acted) — NOT created_at (when we ingested)
+    // Filter signals for this user's time window using created_at
     let userSignals = recentSignals.filter(
-      (s: any) => s.event_date >= cutoff
+      (s: any) => s.created_at >= cutoff
     )
 
     // If user has sector preferences, filter (but always include high-impact)
@@ -131,12 +128,11 @@ async function sendDigest() {
 
     if (userSignals.length === 0) continue
 
-    // Cap at top 15 signals
-    const topSignals = userSignals.slice(0, 15)
-    const html = buildDigestEmail(topSignals, isWeekly)
-    const subject = isWeekly
-      ? `HillSignal Weekly Digest — ${topSignals.length} Signal${topSignals.length > 1 ? 's' : ''}`
-      : `HillSignal Daily Digest — ${topSignals.length} Signal${topSignals.length > 1 ? 's' : ''}`
+    const topSignals = userSignals.slice(0, maxSignals)
+
+    // Build the subject line — Bloomberg style with top ticker/amount
+    const subject = buildSubjectLine(topSignals, isWeekly)
+    const html = buildDigestEmail(topSignals, isWeekly, userSignals.length)
 
     try {
       const res = await fetch('https://api.resend.com/emails', {
@@ -178,89 +174,301 @@ async function sendDigest() {
   })
 }
 
-function sentimentLabel(sentiment: string) {
-  if (sentiment === 'bullish') return '<span style="color:#22c55e;font-weight:600;font-size:12px;">BULLISH</span>'
-  if (sentiment === 'bearish') return '<span style="color:#ef4444;font-weight:600;font-size:12px;">BEARISH</span>'
-  return '<span style="color:#94a3b8;font-weight:600;font-size:12px;">NEUTRAL</span>'
+/* ───────────────────────────────────────────────────
+ *  FORMATTING HELPERS
+ * ─────────────────────────────────────────────────── */
+
+function formatDollarAmount(amount: number): string {
+  const abs = Math.abs(amount)
+  if (abs >= 1_000_000_000) {
+    const b = abs / 1_000_000_000
+    return `$${b >= 100 ? b.toFixed(0) : b.toFixed(1)}B`
+  }
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000
+    return `$${m >= 100 ? m.toFixed(0) : m.toFixed(1)}M`
+  }
+  if (abs >= 1_000) return `$${(abs / 1_000).toFixed(0)}K`
+  return `$${abs.toFixed(0)}`
 }
 
-function impactBadge(score: number) {
-  if (score >= 8) return `<span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">HIGH ${score}/10</span>`
-  if (score >= 5) return `<span style="background:#f59e0b;color:#000;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">MED ${score}/10</span>`
-  return `<span style="background:#6b7280;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">LOW ${score}/10</span>`
+/** Fix malformed dollar amounts in titles like "$10410.5M" → "$10.4B" */
+function fixDollars(text: string): string {
+  return text.replace(/\$[\d,]+(?:\.\d+)?[MBK]/g, (match) => {
+    const suffix = match.slice(-1)
+    const num = parseFloat(match.slice(1, -1).replace(/,/g, ''))
+    if (isNaN(num)) return match
+    const mult: Record<string, number> = { K: 1_000, M: 1_000_000, B: 1_000_000_000 }
+    return formatDollarAmount(num * (mult[suffix] ?? 1))
+  })
 }
 
-function buildDigestEmail(signals: any[], isWeekly: boolean): string {
+/** Extract contract dollar amount from raw_data or title */
+function getContractAmount(signal: any): string | null {
+  const rawAmount = signal.raw_data?.award_amount
+  if (rawAmount && typeof rawAmount === 'number' && rawAmount > 0) {
+    return formatDollarAmount(rawAmount)
+  }
+  // Fallback: parse from title
+  const match = signal.title?.match(/\$[\d,.]+[MBK]?/i)
+  return match ? fixDollars(match[0]) : null
+}
+
+/** Build Bloomberg-style subject line */
+function buildSubjectLine(signals: any[], isWeekly: boolean): string {
+  const period = isWeekly ? 'Weekly' : 'Daily'
+
+  // Find the most impactful signal for the headline
+  const top = signals[0]
+  if (!top) return `HillSignal ${period} Brief`
+
+  // Collect all unique tickers
+  const allTickers = [...new Set(signals.flatMap((s: any) => s.tickers ?? []))]
+  const tickerStr = allTickers.slice(0, 3).map(t => `$${t}`).join(' ')
+
+  if (top.event_type === 'contract_award') {
+    const amount = getContractAmount(top)
+    const recipient = top.raw_data?.recipient_name?.split(' ').slice(0, 2).join(' ') ?? ''
+    if (amount && recipient) {
+      return `${recipient} wins ${amount} contract${tickerStr ? ` — ${tickerStr}` : ''}`
+    }
+  }
+
+  // Bill: use short title + tickers
+  const shortTitle = (top.title ?? '').slice(0, 50).replace(/\s+\S*$/, '')
+  if (tickerStr) return `${shortTitle}… — ${tickerStr}`
+  return `HillSignal ${period} Brief — ${signals.length} Signals`
+}
+
+/* ───────────────────────────────────────────────────
+ *  EMAIL TEMPLATE — Bloomberg-style brief
+ * ─────────────────────────────────────────────────── */
+
+function sentimentDot(sentiment: string): string {
+  const colors: Record<string, string> = { bullish: '#22c55e', bearish: '#ef4444', neutral: '#64748b' }
+  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colors[sentiment] ?? colors.neutral};margin-right:6px;vertical-align:middle;"></span>`
+}
+
+function sentimentWord(sentiment: string): string {
+  const styles: Record<string, string> = {
+    bullish: 'color:#22c55e;font-weight:700;font-size:11px;letter-spacing:0.5px;',
+    bearish: 'color:#ef4444;font-weight:700;font-size:11px;letter-spacing:0.5px;',
+    neutral: 'color:#64748b;font-weight:700;font-size:11px;letter-spacing:0.5px;',
+  }
+  return `<span style="${styles[sentiment] ?? styles.neutral}">${(sentiment ?? 'neutral').toUpperCase()}</span>`
+}
+
+function buildSignalCard(signal: any, index: number, appUrl: string): string {
+  const isContract = signal.event_type === 'contract_award'
+  const amount = isContract ? getContractAmount(signal) : null
+  const recipient = signal.raw_data?.recipient_name ?? null
+  const agency = signal.raw_data?.awarding_agency ?? null
+  const title = fixDollars(signal.title ?? 'Untitled')
+  const tickers = (signal.tickers ?? []) as string[]
+  const sectors = (signal.affected_sectors ?? []) as string[]
+
+  // Type label
+  const typeLabel = isContract
+    ? '<span style="background:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.5px;">CONTRACT</span>'
+    : '<span style="background:#1a2e1a;color:#4ade80;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.5px;">BILL</span>'
+
+  // Dollar amount badge (contracts only)
+  const amountBadge = amount
+    ? `<span style="background:#14532d;color:#4ade80;padding:3px 10px;border-radius:4px;font-size:13px;font-weight:700;font-family:monospace;letter-spacing:-0.3px;">${amount}</span>`
+    : ''
+
+  // Ticker pills
+  const tickerPills = tickers.length > 0
+    ? tickers.slice(0, 5).map(t =>
+      `<span style="background:#172554;color:#60a5fa;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:600;font-family:monospace;margin-right:4px;">$${t}</span>`
+    ).join('')
+    : ''
+
+  // Summary — keep it tight
+  const summary = (signal.summary ?? '').slice(0, 160) + ((signal.summary?.length ?? 0) > 160 ? '…' : '')
+
+  // Contract-specific subtitle
+  const contractMeta = isContract && recipient
+    ? `<div style="color:#94a3b8;font-size:12px;margin-top:4px;">${recipient}${agency ? ` · ${agency}` : ''}</div>`
+    : ''
+
+  // Sector tag
+  const sectorTag = sectors.length > 0
+    ? `<span style="color:#64748b;font-size:11px;margin-left:8px;">${sectors[0]}</span>`
+    : ''
+
+  return `
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#111827;border-radius:8px;margin-bottom:12px;border-left:3px solid ${signal.sentiment === 'bullish' ? '#22c55e' : signal.sentiment === 'bearish' ? '#ef4444' : '#334155'};">
+          <tr>
+            <td style="padding:16px 18px;">
+              <!-- Row 1: Type + Sentiment + Amount -->
+              <div style="margin-bottom:8px;">
+                ${typeLabel}
+                <span style="margin-left:8px;">${sentimentDot(signal.sentiment)}${sentimentWord(signal.sentiment)}</span>
+                ${amountBadge ? `<span style="float:right;">${amountBadge}</span>` : ''}
+              </div>
+              <!-- Row 2: Title -->
+              <a href="${appUrl}/signals/${signal.id}" style="color:#f1f5f9;font-size:15px;font-weight:600;text-decoration:none;line-height:1.35;display:block;">
+                ${title}
+              </a>
+              ${contractMeta}
+              <!-- Row 3: Summary -->
+              <p style="color:#94a3b8;font-size:13px;margin:8px 0 0;line-height:1.5;">
+                ${summary}
+              </p>
+              <!-- Row 4: Tickers + Sector -->
+              ${tickerPills || sectorTag ? `<div style="margin-top:10px;">${tickerPills}${sectorTag}</div>` : ''}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`
+}
+
+function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: number): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hillsignal.com'
   const period = isWeekly ? 'This Week' : 'Today'
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 
-  const signalRows = signals.map((s: any) => `
-    <tr>
-      <td style="padding:16px 20px;border-bottom:1px solid #1e293b;">
-        <div style="margin-bottom:8px;">
-          ${sentimentLabel(s.sentiment)} ${impactBadge(s.impact_score)}
-          <span style="color:#94a3b8;font-size:12px;margin-left:8px;text-transform:uppercase;">${s.event_type?.replace('_', ' ')}</span>
-        </div>
-        <a href="${appUrl}/signals/${s.id}" style="color:#e2e8f0;font-size:16px;font-weight:600;text-decoration:none;line-height:1.4;">
-          ${s.title}
-        </a>
-        <p style="color:#94a3b8;font-size:14px;margin:8px 0 4px;line-height:1.5;">
-          ${s.summary?.slice(0, 200)}${(s.summary?.length ?? 0) > 200 ? '...' : ''}
-        </p>
-        ${s.tickers?.length ? `<div style="margin-top:6px;">${s.tickers.map((t: string) => `<span style="background:#1e3a5f;color:#60a5fa;padding:2px 6px;border-radius:3px;font-size:11px;margin-right:4px;">$${t}</span>`).join('')}</div>` : ''}
-      </td>
-    </tr>
-  `).join('')
+  // Stats
+  const bullishCount = signals.filter(s => s.sentiment === 'bullish').length
+  const bearishCount = signals.filter(s => s.sentiment === 'bearish').length
+  const contractCount = signals.filter(s => s.event_type === 'contract_award').length
+  const billCount = signals.filter(s => s.event_type === 'bill').length
+  const allTickers = [...new Set(signals.flatMap((s: any) => s.tickers ?? []))]
+
+  // Build signal cards
+  const signalCards = signals.map((s, i) => buildSignalCard(s, i, appUrl)).join('')
+
+  // Top tickers strip
+  const tickerStrip = allTickers.length > 0
+    ? allTickers.slice(0, 8).map(t =>
+      `<span style="color:#60a5fa;font-size:12px;font-weight:600;font-family:monospace;margin-right:12px;">$${t}</span>`
+    ).join('')
+    : ''
 
   return `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#0a0f1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f1a;">
-    <tr><td align="center" style="padding:20px;">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:12px;overflow:hidden;max-width:600px;width:100%;">
-        <!-- Header -->
+<body style="margin:0;padding:0;background:#030712;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#030712;">
+    <tr><td align="center" style="padding:16px;">
+      <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;">
+
+        <!-- HEADER -->
         <tr>
-          <td style="padding:32px 24px;text-align:center;border-bottom:1px solid #1e293b;">
-            <div style="font-size:28px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">HillSignal</div>
-            <div style="color:#60a5fa;font-size:14px;margin-top:8px;font-weight:500;">${isWeekly ? 'Weekly' : 'Daily'} Market Intelligence Digest</div>
-          </td>
-        </tr>
-        <!-- Summary -->
-        <tr>
-          <td style="padding:20px 24px;">
-            <div style="background:#1e293b;border-radius:8px;padding:16px 20px;">
-              <span style="color:#94a3b8;font-size:14px;">${period}:</span>
-              <span style="color:#e2e8f0;font-size:14px;font-weight:600;"> ${signals.length} signal${signals.length > 1 ? 's' : ''} detected</span>
-            </div>
-          </td>
-        </tr>
-        <!-- Signals -->
-        <tr>
-          <td>
+          <td style="padding:24px 24px 16px;">
             <table width="100%" cellpadding="0" cellspacing="0">
-              ${signalRows}
+              <tr>
+                <td>
+                  <span style="font-size:22px;font-weight:800;color:#f8fafc;letter-spacing:-0.5px;">HILLSIGNAL</span>
+                  <span style="color:#334155;font-size:22px;font-weight:300;margin-left:4px;">|</span>
+                  <span style="color:#64748b;font-size:13px;font-weight:500;margin-left:8px;vertical-align:middle;">${isWeekly ? 'WEEKLY' : 'DAILY'} BRIEF</span>
+                </td>
+                <td style="text-align:right;">
+                  <span style="color:#475569;font-size:11px;">${dateStr}</span>
+                </td>
+              </tr>
             </table>
           </td>
         </tr>
+
+        <!-- DIVIDER -->
+        <tr><td style="padding:0 24px;"><div style="border-top:2px solid #1e293b;"></div></td></tr>
+
+        <!-- MARKET PULSE STRIP -->
+        <tr>
+          <td style="padding:16px 24px 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#0f172a;border-radius:8px;padding:14px 18px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:1px;padding-bottom:8px;" colspan="4">MARKET PULSE</td>
+                    </tr>
+                    <tr>
+                      <td style="width:25%;">
+                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">SIGNALS</div>
+                        <div style="color:#f1f5f9;font-size:18px;font-weight:700;">${signals.length}</div>
+                      </td>
+                      <td style="width:25%;">
+                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">BULLISH</div>
+                        <div style="color:#22c55e;font-size:18px;font-weight:700;">${bullishCount}</div>
+                      </td>
+                      <td style="width:25%;">
+                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">BEARISH</div>
+                        <div style="color:#ef4444;font-size:18px;font-weight:700;">${bearishCount}</div>
+                      </td>
+                      <td style="width:25%;">
+                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">CONTRACTS</div>
+                        <div style="color:#60a5fa;font-size:18px;font-weight:700;">${contractCount}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- TICKERS STRIP -->
+        ${tickerStrip ? `
+        <tr>
+          <td style="padding:4px 24px 12px;">
+            <div style="background:#0f172a;border-radius:6px;padding:10px 18px;overflow:hidden;">
+              <span style="color:#475569;font-size:10px;font-weight:600;letter-spacing:1px;margin-right:12px;">TICKERS IN PLAY</span>
+              ${tickerStrip}
+            </div>
+          </td>
+        </tr>` : ''}
+
+        <!-- SECTION LABEL -->
+        <tr>
+          <td style="padding:16px 24px 8px;">
+            <span style="color:#64748b;font-size:11px;font-weight:700;letter-spacing:1.5px;">TOP SIGNALS — ${period.toUpperCase()}</span>
+          </td>
+        </tr>
+
+        <!-- SIGNAL CARDS -->
+        ${signalCards}
+
+        <!-- MORE SIGNALS NOTE -->
+        ${totalAvailable > signals.length ? `
+        <tr>
+          <td style="padding:4px 24px 12px;">
+            <div style="color:#475569;font-size:12px;text-align:center;">
+              + ${totalAvailable - signals.length} more signals on your dashboard
+            </div>
+          </td>
+        </tr>` : ''}
+
         <!-- CTA -->
         <tr>
-          <td style="padding:24px;text-align:center;">
-            <a href="${appUrl}/dashboard" style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-              View All Signals →
+          <td style="padding:16px 24px 24px;text-align:center;">
+            <a href="${appUrl}/dashboard" style="display:inline-block;background:#1d4ed8;color:#ffffff;padding:12px 36px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.3px;">
+              VIEW FULL DASHBOARD →
             </a>
           </td>
         </tr>
-        <!-- Footer -->
+
+        <!-- FOOTER -->
         <tr>
-          <td style="padding:20px 24px;border-top:1px solid #1e293b;text-align:center;">
-            <p style="color:#64748b;font-size:12px;margin:0;line-height:1.6;">
-              You're receiving this because you enabled digest emails in your
-              <a href="${appUrl}/settings" style="color:#60a5fa;text-decoration:none;">HillSignal settings</a>.
+          <td style="padding:0 24px;"><div style="border-top:1px solid #1e293b;"></div></td>
+        </tr>
+        <tr>
+          <td style="padding:16px 24px;text-align:center;">
+            <p style="color:#475569;font-size:11px;margin:0;line-height:1.6;">
+              Congressional intelligence for investors · <a href="${appUrl}/settings" style="color:#475569;text-decoration:underline;">Manage preferences</a>
+            </p>
+            <p style="color:#334155;font-size:10px;margin:6px 0 0;">
+              Not financial advice. Past legislative activity is not indicative of future market performance.
             </p>
           </td>
         </tr>
+
       </table>
     </td></tr>
   </table>
