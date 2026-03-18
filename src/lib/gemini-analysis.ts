@@ -94,7 +94,8 @@ Provide analysis in the following JSON format:
   "full_analysis": "<3-5 paragraphs: 1) The contract — who got it, how much, for what. 2) The parent company or publicly traded beneficiary and revenue impact. 3) Connection to legislation — which bill authorized this spending. 4) Supply chain winners — subcontractors and suppliers with tickers. 5) Historical pattern — what happened after similar awards.>",
   "key_takeaways": ["takeaway1", "takeaway2", "takeaway3"],
   "market_implications": "<1-2 paragraphs. Direct. Name tickers. Quantify where possible.>",
-  "impact_factors": "<Why this score. Reference: contract size relative to company revenue, sector momentum, legislative backing, supply chain breadth.>"
+  "impact_factors": "<Why this score. Reference: contract size relative to company revenue, sector momentum, legislative backing, supply chain breadth.>",
+  "related_bill_numbers": ["HR1234", "S567"] or [] if none identified. Use official bill number format (HR/S/HJRES/SJRES + number).
 }
 
 Impact scoring: 1-3 = routine renewal or small contract. 4-6 = meaningful new business for a public company. 7-8 = large contract shifting competitive dynamics. 9-10 = historic-scale award reshaping a sector.
@@ -184,7 +185,7 @@ export async function analyzeCongressItem(item: RawCongressItem): Promise<Partia
 
     console.log(`[ai] Success: ${item?.title?.slice?.(0, 40)}`)
     return {
-      event_type: item?.type === 'meeting' ? 'hearing' : (item?.type as any) ?? 'bill',
+      event_type: 'bill' as const,
       title: item?.title ?? 'Unknown',
       summary: analysis?.summary ?? 'Analysis unavailable',
       full_analysis: analysis?.full_analysis ?? null,
@@ -268,6 +269,16 @@ export async function analyzeContractItem(
       event_date: item.start_date ?? new Date().toISOString(),
       key_takeaways: analysis?.key_takeaways ?? [],
       market_implications: analysis?.market_implications ?? null,
+      raw_data: {
+        recipient_name: item.recipient_name ?? null,
+        award_amount: item.award_amount ?? null,
+        awarding_agency: item.awarding_agency ?? null,
+        awarding_sub_agency: item.awarding_sub_agency ?? null,
+        naics_code: item.naics_code ?? null,
+        contract_type: item.contract_type ?? null,
+        award_id: item.award_id ?? null,
+        related_bill_numbers: analysis?.related_bill_numbers ?? [],
+      },
     }
   } catch (err: any) {
     console.error(`[ai] Contract analysis failed:`, err?.message)

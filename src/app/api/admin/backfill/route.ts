@@ -311,7 +311,7 @@ async function backfillContracts() {
           const { data: billSignals } = await adminClient
             .from('signals')
             .select('title, bill_number, sentiment, impact_score, affected_sectors, event_type')
-            .in('event_type', ['bill', 'vote', 'hearing'])
+            .eq('event_type', 'bill')
             .order('created_at', { ascending: false })
             .limit(20)
 
@@ -351,6 +351,7 @@ async function backfillContracts() {
                   event_date: signal?.event_date ?? new Date().toISOString(),
                   key_takeaways: signal?.key_takeaways ?? [],
                   market_implications: signal?.market_implications ?? null,
+                  raw_data: (signal as any)?.raw_data ?? null,
                 })
                 if (!insertError) stored++
               }

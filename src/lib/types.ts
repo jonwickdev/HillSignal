@@ -37,7 +37,7 @@ export interface Purchase {
 
 export interface Signal {
   id: string
-  event_type: 'bill' | 'hearing' | 'vote' | 'amendment' | 'committee_action' | 'floor_action' | 'contract_award'
+  event_type: 'bill' | 'contract_award'
   title: string
   summary: string
   full_analysis: string | null
@@ -53,6 +53,7 @@ export interface Signal {
   event_date: string
   key_takeaways: string[]
   market_implications: string | null
+  raw_data?: Record<string, any> | null
   created_at: string
   updated_at: string
 }

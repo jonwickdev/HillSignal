@@ -428,7 +428,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
   const sectors = ['all', ...ALL_SECTORS]
 
   // All known event types
-  const eventTypes = ['bill', 'vote', 'hearing', 'contract_award']
+  const eventTypes = ['bill', 'contract_award']
 
   // Helper: is a signal fully analyzed or just tracked?
   const isAnalyzed = (s: Signal) => !!(s.full_analysis && s.full_analysis.length > 0)

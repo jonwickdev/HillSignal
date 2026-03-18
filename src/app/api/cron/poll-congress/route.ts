@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
-import { fetchAllRecent, enrichBillItems } from '@/lib/congress-api'
+import { fetchRecentBills, enrichBillItems } from '@/lib/congress-api'
 import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -70,7 +70,7 @@ async function runPoll() {
 
     // 1. Fetch from Congress.gov
     console.log('Polling Congress.gov...', fromDateTime ? `since ${fromDateTime}` : 'initial poll')
-    const rawItems = await fetchAllRecent(fromDateTime)
+    const rawItems = await fetchRecentBills(fromDateTime, 100)
     console.log(`Fetched ${rawItems?.length ?? 0} items from Congress.gov`)
 
     if ((rawItems?.length ?? 0) === 0) {
