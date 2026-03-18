@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { Signal } from '@/lib/types'
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText } from 'lucide-react'
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText, Link2, DollarSign, FileBarChart } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
   bullish: { color: 'text-hill-green', bg: 'bg-hill-green/10', border: 'border-hill-green/30', label: 'Bullish', Icon: TrendingUp },
@@ -12,7 +12,12 @@ const sentimentConfig: Record<string, { color: string; bg: string; border: strin
   neutral: { color: 'text-hill-blue', bg: 'bg-hill-blue/10', border: 'border-hill-blue/30', label: 'Neutral', Icon: Minus },
 }
 
-export default function SignalDetailClient({ signal }: { signal: Signal }) {
+interface ConnectedSignal extends Signal {
+  _connectionReasons?: string[]
+  _connectionScore?: number
+}
+
+export default function SignalDetailClient({ signal, connectedSignals = [] }: { signal: Signal; connectedSignals?: ConnectedSignal[] }) {
   const sentiment = sentimentConfig?.[signal?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
   const SentimentIcon = sentiment?.Icon ?? Minus
   const hasAnalysis = !!(signal?.full_analysis && signal.full_analysis.length > 0)
@@ -161,6 +166,142 @@ export default function SignalDetailClient({ signal }: { signal: Signal }) {
             <span>Minimal Impact</span><span>Moderate</span><span>Major Market Event</span>
           </div>
         </Card>
+
+        {/* Connected Signals — Follow the Money */}
+        {connectedSignals.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-hill-orange/10 rounded-lg border border-hill-orange/30">
+                <Link2 size={18} className="text-hill-orange" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-hill-white">Connected Signals</h2>
+                <p className="text-xs text-hill-muted">Follow the money — bills, contracts, and tickers that connect</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {connectedSignals.map((cs) => {
+                const csSentiment = sentimentConfig?.[cs?.sentiment ?? 'neutral'] ?? sentimentConfig?.neutral
+                const CsIcon = cs.event_type === 'contract_award' ? DollarSign : FileBarChart
+                const reasons = cs._connectionReasons ?? []
+                const topReason = reasons[0] ?? 'Related signal'
+                const isStrongLink = (cs._connectionScore ?? 0) >= 10
+
+                return (
+                  <Link key={cs.id} href={`/signals/${cs.id}`}>
+                    <Card hover className="p-4 group cursor-pointer transition-all">
+                      <div className="flex items-start gap-3">
+                        {/* Type icon */}
+                        <div className={`shrink-0 mt-1 p-1.5 rounded-lg ${
+                          cs.event_type === 'contract_award'
+                            ? 'bg-hill-green/10 border border-hill-green/30'
+                            : 'bg-hill-blue/10 border border-hill-blue/30'
+                        }`}>
+                          <CsIcon size={14} className={cs.event_type === 'contract_award' ? 'text-hill-green' : 'text-hill-blue'} />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 bg-hill-gray rounded text-hill-muted">
+                              {cs.event_type === 'contract_award' ? 'Contract' : 'Bill'}
+                            </span>
+                            {isStrongLink && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 bg-hill-orange/10 border border-hill-orange/30 rounded text-hill-orange">
+                                Direct Link
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${csSentiment?.bg ?? ''} ${csSentiment?.border ?? ''} ${csSentiment?.color ?? ''}`}>
+                              {csSentiment?.label ?? 'Neutral'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-hill-white font-medium leading-snug truncate group-hover:text-hill-orange transition-colors">
+                            {cs.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-[11px] text-hill-muted">{topReason}</span>
+                            {(cs.tickers?.length ?? 0) > 0 && (
+                              <span className="text-[11px] font-mono text-hill-orange">
+                                {cs.tickers.slice(0, 3).join(' · ')}{cs.tickers.length > 3 ? ` +${cs.tickers.length - 3}` : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Score */}
+                        <div className="shrink-0 text-right">
+                          <span className="font-mono text-sm text-hill-white font-bold">{cs.impact_score}</span>
+                          <span className="text-hill-muted text-xs">/10</span>
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Contract Details — raw_data for contract awards */}
+        {signal.event_type === 'contract_award' && signal.raw_data && (
+          <Card className="mb-8">
+            <h2 className="text-lg font-semibold text-hill-white mb-4 flex items-center gap-2">
+              <DollarSign size={18} className="text-hill-green" /> Contract Details
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {signal.raw_data.recipient_name && (
+                <div>
+                  <p className="text-xs text-hill-muted mb-0.5">Recipient</p>
+                  <p className="text-sm text-hill-white font-medium">{signal.raw_data.recipient_name}</p>
+                </div>
+              )}
+              {signal.raw_data.award_amount && (
+                <div>
+                  <p className="text-xs text-hill-muted mb-0.5">Award Amount</p>
+                  <p className="text-sm text-hill-orange font-mono font-bold">
+                    ${Number(signal.raw_data.award_amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+              )}
+              {signal.raw_data.awarding_agency && (
+                <div>
+                  <p className="text-xs text-hill-muted mb-0.5">Awarding Agency</p>
+                  <p className="text-sm text-hill-white">{signal.raw_data.awarding_agency}</p>
+                </div>
+              )}
+              {signal.raw_data.awarding_sub_agency && (
+                <div>
+                  <p className="text-xs text-hill-muted mb-0.5">Sub-Agency</p>
+                  <p className="text-sm text-hill-white">{signal.raw_data.awarding_sub_agency}</p>
+                </div>
+              )}
+              {signal.raw_data.naics_code && (
+                <div>
+                  <p className="text-xs text-hill-muted mb-0.5">NAICS Code</p>
+                  <p className="text-sm text-hill-white font-mono">{signal.raw_data.naics_code}</p>
+                </div>
+              )}
+              {signal.raw_data.contract_type && (
+                <div>
+                  <p className="text-xs text-hill-muted mb-0.5">Contract Type</p>
+                  <p className="text-sm text-hill-white">{signal.raw_data.contract_type}</p>
+                </div>
+              )}
+              {signal.raw_data.related_bill_numbers?.length > 0 && (
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-hill-muted mb-1">Related Bills</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {signal.raw_data.related_bill_numbers.map((bn: string) => (
+                      <span key={bn} className="text-xs font-mono bg-hill-orange/10 text-hill-orange border border-hill-orange/30 px-2 py-0.5 rounded">
+                        {bn}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Links */}
         <div className="flex flex-wrap gap-4">
