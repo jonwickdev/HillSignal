@@ -798,13 +798,16 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                     <div key={signal.id} className={`flex items-center gap-3 px-4 py-3 bg-hill-dark rounded-lg border transition-all hover:border-hill-orange/30 ${
                       isFavorited ? 'border-yellow-500/40' : 'border-hill-border'
                     }`}>
-                      {/* Date — use created_at for bills (event_date can be stale), event_date for contracts */}
+                      {/* Date + Updated badge */}
                       <span className="text-xs text-hill-muted font-mono w-16 shrink-0">
                         {(() => {
                           const d = signal?.event_type === 'contract_award' ? signal?.event_date : (signal?.created_at || signal?.event_date)
                           return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
                         })()}
                       </span>
+                      {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 48 * 60 * 60 * 1000 && (
+                        <span className="px-1.5 py-0.5 bg-hill-orange/15 text-hill-orange text-[9px] font-bold rounded uppercase tracking-wide shrink-0 animate-pulse">Updated</span>
+                      )}
                       {/* Type badge */}
                       <span className="px-2 py-0.5 bg-hill-gray rounded text-xs text-hill-muted shrink-0 w-24 text-center">
                         {formatEventType(signal?.event_type ?? 'bill')}
@@ -899,6 +902,9 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                                   return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
                                 })()}
                               </span>
+                              {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 48 * 60 * 60 * 1000 && (
+                                <span className="px-1.5 py-0.5 bg-hill-orange/15 text-hill-orange text-[9px] font-bold rounded uppercase tracking-wide animate-pulse">Updated</span>
+                              )}
                             </div>
                             <Link href={`/signals/${signal?.id ?? ''}`} className="hover:text-hill-orange transition-colors">
                               <h2 className="text-[15px] font-semibold text-hill-white leading-snug">{fixTitleDollars(signal?.title ?? 'Untitled')}</h2>

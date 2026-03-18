@@ -25,12 +25,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { createAdminClient } = await import('@/lib/supabase/server')
       const admin = createAdminClient()
 
-      // Only include analyzed signals (impact_score > 3, has sectors) — quality pages only
+      // Only include analyzed signals from the last 12 months with quality gate
+      // Older signals stay in DB (for marketing counts) but aren't exposed to crawlers
+      const twelveMonthsAgo = new Date()
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const { data: signals } = await admin
         .from('signals')
-        .select('id, updated_at, created_at, impact_score')
+        .select('id, updated_at, created_at, impact_score, event_date')
         .gt('impact_score', 3)
         .not('affected_sectors', 'eq', '{}')
+        .gte('event_date', twelveMonthsAgo.toISOString())
         .order('created_at', { ascending: false })
         .limit(5000)
 
