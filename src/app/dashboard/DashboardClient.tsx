@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import { createClient } from '@/lib/supabase/client'
 import type { Signal } from '@/lib/types'
-import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search, User, List, BarChart3 } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search, User, List, BarChart3, Calendar } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
   bullish: { color: 'text-hill-green', bg: 'bg-hill-green/10', border: 'border-hill-green/30', label: 'Bullish', Icon: TrendingUp },
@@ -84,6 +84,35 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
   const [selectedSentiment, setSelectedSentiment] = useState<string>('all')
   const [selectedType, setSelectedType] = useState<string>('all')
 
+  // Date range filter (event_date, not created_at)
+  const [dateRange, setDateRange] = useState<string>('90d') // preset key or 'custom'
+  const [customDateFrom, setCustomDateFrom] = useState<string>('')
+  const [customDateTo, setCustomDateTo] = useState<string>('')
+
+  const DATE_PRESETS: { key: string; label: string; days: number | null }[] = [
+    { key: '7d', label: '7 Days', days: 7 },
+    { key: '30d', label: '30 Days', days: 30 },
+    { key: '90d', label: '90 Days', days: 90 },
+    { key: 'all', label: 'All Time', days: null },
+    { key: 'custom', label: 'Custom', days: null },
+  ]
+
+  // Compute actual dateFrom/dateTo for API calls
+  const getDateParams = useCallback(() => {
+    if (dateRange === 'custom') {
+      return { dateFrom: customDateFrom || undefined, dateTo: customDateTo || undefined }
+    }
+    if (dateRange === 'all') {
+      return { dateFrom: '1900-01-01', dateTo: undefined }
+    }
+    const preset = DATE_PRESETS.find(p => p.key === dateRange)
+    if (preset?.days) {
+      const from = new Date(Date.now() - preset.days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      return { dateFrom: from, dateTo: undefined }
+    }
+    return { dateFrom: undefined, dateTo: undefined }
+  }, [dateRange, customDateFrom, customDateTo])
+
   const pageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE
 
   // Debounce search input
@@ -99,13 +128,13 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
     return () => clearTimeout(t)
   }, [pollResult])
 
-  // Re-fetch when search, filters, sector, or view mode change
+  // Re-fetch when search, filters, sector, view mode, or date range change
   useEffect(() => {
     if (!loading) {
       fetchSignals(false, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, selectedSentiment, selectedType, selectedSector, viewMode])
+  }, [debouncedSearch, selectedSentiment, selectedType, selectedSector, viewMode, dateRange, customDateFrom, customDateTo])
 
   // Extra signals fetched by ID (favorites beyond 90-day window)
   const [extraSignals, setExtraSignals] = useState<Signal[]>([])
@@ -136,6 +165,13 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
       const currentPageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE
 
+      // Helper: append dateFrom/dateTo to any URLSearchParams
+      const applyDate = (p: URLSearchParams) => {
+        const { dateFrom, dateTo } = getDateParams()
+        if (dateFrom) p.set('dateFrom', dateFrom)
+        if (dateTo) p.set('dateTo', dateTo)
+      }
+
       if (refresh) {
         // Fire BOTH bill poll and contract poll in parallel
         const billParams = new URLSearchParams()
@@ -147,6 +183,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
         if (selectedSentiment !== 'all') billParams.set('sentiment', selectedSentiment)
         if (selectedType !== 'all') billParams.set('event_type', selectedType)
         billParams.set('limit', String(currentPageSize))
+        applyDate(billParams)
 
         const contractUrl = selectedSector !== 'all'
           ? `/api/cron/poll-contracts?sector=${encodeURIComponent(selectedSector)}`
@@ -181,6 +218,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
             if (selectedSentiment !== 'all') refreshParams.set('sentiment', selectedSentiment)
             if (selectedType !== 'all') refreshParams.set('event_type', selectedType)
             refreshParams.set('limit', String(currentPageSize))
+            applyDate(refreshParams)
             const finalRes = await fetch(`/api/signals?${refreshParams.toString()}`)
             const finalData = await finalRes?.json?.()
             if (finalRes?.ok) {
@@ -212,6 +250,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
         if (selectedSentiment !== 'all') params.set('sentiment', selectedSentiment)
         if (selectedType !== 'all') params.set('event_type', selectedType)
         params.set('limit', String(currentPageSize))
+        applyDate(params)
 
         const res = await fetch(`/api/signals?${params.toString()}`)
         const data = await res?.json?.()
@@ -229,7 +268,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
       setRefreshing(false)
       setPolling(false)
     }
-  }, [debouncedSearch, selectedSentiment, selectedType, selectedSector, viewMode, signals.length])
+  }, [debouncedSearch, selectedSentiment, selectedType, selectedSector, viewMode, signals.length, getDateParams])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
@@ -244,6 +283,9 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (selectedSentiment !== 'all') params.set('sentiment', selectedSentiment)
       if (selectedType !== 'all') params.set('event_type', selectedType)
+      const { dateFrom, dateTo } = getDateParams()
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
 
       const res = await fetch(`/api/signals?${params.toString()}`)
       const data = await res?.json?.()
@@ -256,7 +298,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, hasMore, signals.length, debouncedSearch, selectedSector, selectedSentiment, selectedType, viewMode])
+  }, [loadingMore, hasMore, signals.length, debouncedSearch, selectedSector, selectedSentiment, selectedType, viewMode, getDateParams])
 
   // Toggle favorite/dismiss
   const toggleAction = useCallback(async (signalId: string, action: 'favorite' | 'dismissed') => {
@@ -553,8 +595,32 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
             </div>
           </div>
 
+          {/* Row 3: Date range pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Calendar size={14} className="text-hill-muted" />
+            {DATE_PRESETS.map((p) => (
+              <button key={p.key} onClick={() => setDateRange(p.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                  dateRange === p.key
+                    ? 'bg-hill-orange text-white'
+                    : 'bg-hill-gray text-hill-muted hover:text-hill-white border border-hill-border'
+                }`}>
+                {p.label}
+              </button>
+            ))}
+            {dateRange === 'custom' && (
+              <div className="flex items-center gap-2 ml-2">
+                <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)}
+                  className="bg-hill-gray border border-hill-border text-hill-white text-xs rounded-lg px-2 py-1.5 focus:border-hill-orange focus:outline-none" />
+                <span className="text-hill-muted text-xs">to</span>
+                <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)}
+                  className="bg-hill-gray border border-hill-border text-hill-white text-xs rounded-lg px-2 py-1.5 focus:border-hill-orange focus:outline-none" />
+              </div>
+            )}
+          </div>
+
           {/* Active filter summary */}
-          {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch) && (
+          {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch || dateRange !== '90d') && (
             <div className="flex items-center gap-2 text-xs text-hill-muted">
               <span>Active filters:</span>
               {selectedSentiment !== 'all' && (
@@ -587,8 +653,14 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                   <button onClick={() => setSearchQuery('')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
                 </span>
               )}
+              {dateRange !== '90d' && (
+                <span className="bg-hill-gray px-2 py-0.5 rounded flex items-center gap-1">
+                  {dateRange === 'custom' ? `${customDateFrom || '…'} → ${customDateTo || '…'}` : DATE_PRESETS.find(p => p.key === dateRange)?.label ?? dateRange}
+                  <button onClick={() => setDateRange('90d')} className="text-hill-muted hover:text-hill-white"><X size={10} /></button>
+                </span>
+              )}
               <button
-                onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery('') }}
+                onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery(''); setDateRange('90d'); setCustomDateFrom(''); setCustomDateTo('') }}
                 className="text-hill-orange hover:text-hill-orange/80 ml-1">
                 Clear all
               </button>
@@ -891,8 +963,8 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
               {(signals?.length ?? 0) === 0 && selectedSentiment === 'all' && selectedType === 'all' && !debouncedSearch && (
                 <Button onClick={() => fetchSignals(true, true)} loading={refreshing}>Poll Now</Button>
               )}
-              {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch) && (
-                <Button variant="ghost" onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery('') }}>Clear All Filters</Button>
+              {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch || dateRange !== '90d') && (
+                <Button variant="ghost" onClick={() => { setSelectedSentiment('all'); setSelectedType('all'); setSelectedSector('all'); setShowFavoritesOnly(false); setSearchQuery(''); setDateRange('90d'); setCustomDateFrom(''); setCustomDateTo('') }}>Clear All Filters</Button>
               )}
             </div>
           </Card>

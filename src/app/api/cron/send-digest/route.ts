@@ -55,16 +55,19 @@ async function sendDigest() {
     return NextResponse.json({ sent: 0, message: 'No eligible users today' })
   }
 
-  // Fetch recent ANALYZED signals — last 7 days (covers both daily and weekly)
-  // Only include signals with actual AI analysis (full_analysis IS NOT NULL)
+  // Fetch recent ANALYZED signals based on EVENT DATE (when Congress acted),
+  // NOT created_at (when we ingested). This prevents backfilled historical data
+  // from leaking into user-facing digests.
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+  // Use 14-day event_date window (covers weekly users generously)
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: recentSignals, error: sigError } = await supabase
     .from('signals')
     .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date, created_at, full_analysis')
-    .gte('created_at', sevenDaysAgo)
-    .not('full_analysis', 'is', null)           // Must have AI analysis
+    .gte('event_date', fourteenDaysAgo)          // Congressional activity in last 14 days
+    .not('full_analysis', 'is', null)            // Must have AI analysis
     .gt('impact_score', 3)                       // Must have real impact
     .order('impact_score', { ascending: false })
     .limit(100)
@@ -111,8 +114,9 @@ async function sendDigest() {
     const cutoff = isWeekly ? sevenDaysAgo : oneDayAgo
 
     // Filter signals for this user's time window + sector preferences
+    // Use event_date (when Congress acted) — NOT created_at (when we ingested)
     let userSignals = recentSignals.filter(
-      (s: any) => s.created_at >= cutoff || s.event_date >= cutoff
+      (s: any) => s.event_date >= cutoff
     )
 
     // If user has sector preferences, filter (but always include high-impact)

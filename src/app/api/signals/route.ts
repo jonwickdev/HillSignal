@@ -167,8 +167,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ signals: idData ?? [], hasMore: false, totalCount: idData?.length ?? 0 })
     }
 
-    // 90-day window for normal feed
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    // Date range: custom range overrides default 90-day window
+    const dateFrom = searchParams?.get?.('dateFrom')
+    const dateTo = searchParams?.get?.('dateTo')
+    const defaultFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
 
     let query = readClient
       .from('signals')
@@ -181,8 +183,18 @@ export async function GET(request: Request) {
         .not('affected_sectors', 'eq', '{}')      // Must have at least one affected sector
     }
 
+    // Apply event_date window (custom range or default 90 days)
     query = query
-      .gte('event_date', ninetyDaysAgo)           // 90-day retention window
+      .gte('event_date', dateFrom || defaultFrom)
+
+    if (dateTo) {
+      // Add 1 day to dateTo to make it inclusive of the end date
+      const endDate = new Date(dateTo)
+      endDate.setDate(endDate.getDate() + 1)
+      query = query.lt('event_date', endDate.toISOString())
+    }
+
+    query = query
       .order('event_date', { ascending: false })
       .range(offset, offset + limit - 1)          // Inclusive range
 
@@ -202,9 +214,11 @@ export async function GET(request: Request) {
       query = query.eq('event_type', eventType)
     }
 
-    // Server-side text search (title, summary, tickers, and event_type)
+    // Server-side text search (title, summary, bill_number, event_type)
+    // Note: PostgREST does not support ::text casting in .or() filters,
+    // so tickers (jsonb array) must be searched via .cs() or left out.
     if (search) {
-      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,tickers::text.ilike.%${search}%,event_type.ilike.%${search}%`)
+      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%,bill_number.ilike.%${search}%,event_type.ilike.%${search}%`)
     }
 
     const { data, count, error } = await query
