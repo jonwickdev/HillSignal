@@ -289,18 +289,18 @@ function buildSignalCard(signal: any, index: number, appUrl: string): string {
 
   // Contract-specific subtitle
   const contractMeta = isContract && recipient
-    ? `<div style="color:#94a3b8;font-size:12px;margin-top:4px;">${recipient}${agency ? ` · ${agency}` : ''}</div>`
+    ? `<div style="color:#cbd5e1;font-size:12px;margin-top:4px;">${recipient}${agency ? ` · ${agency}` : ''}</div>`
     : ''
 
   // Sector tag
   const sectorTag = sectors.length > 0
-    ? `<span style="color:#64748b;font-size:11px;margin-left:8px;">${sectors[0]}</span>`
+    ? `<span style="color:#94a3b8;font-size:11px;margin-left:8px;">${sectors[0]}</span>`
     : ''
 
   return `
     <tr>
       <td style="padding:0 24px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#111827;border-radius:8px;margin-bottom:12px;border-left:3px solid ${signal.sentiment === 'bullish' ? '#22c55e' : signal.sentiment === 'bearish' ? '#ef4444' : '#334155'};">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#111827;border-radius:8px;margin-bottom:12px;border-left:3px solid ${signal.sentiment === 'bullish' ? '#22c55e' : signal.sentiment === 'bearish' ? '#ef4444' : '#475569'};">
           <tr>
             <td style="padding:16px 18px;">
               <!-- Row 1: Type + Sentiment + Amount -->
@@ -315,7 +315,7 @@ function buildSignalCard(signal: any, index: number, appUrl: string): string {
               </a>
               ${contractMeta}
               <!-- Row 3: Summary -->
-              <p style="color:#94a3b8;font-size:13px;margin:8px 0 0;line-height:1.5;">
+              <p style="color:#cbd5e1;font-size:13px;margin:8px 0 0;line-height:1.5;">
                 ${summary}
               </p>
               <!-- Row 4: Tickers + Sector -->
@@ -345,7 +345,7 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
   // Top tickers strip
   const tickerStrip = allTickers.length > 0
     ? allTickers.slice(0, 8).map(t =>
-      `<span style="color:#60a5fa;font-size:12px;font-weight:600;font-family:monospace;margin-right:12px;">$${t}</span>`
+      `<span style="color:#93c5fd;font-size:14px;font-weight:700;font-family:monospace;margin-right:14px;">$${t}</span>`
     ).join('')
     : ''
 
@@ -365,11 +365,11 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
               <tr>
                 <td>
                   <span style="font-size:22px;font-weight:800;color:#f8fafc;letter-spacing:-0.5px;">HILLSIGNAL</span>
-                  <span style="color:#334155;font-size:22px;font-weight:300;margin-left:4px;">|</span>
-                  <span style="color:#64748b;font-size:13px;font-weight:500;margin-left:8px;vertical-align:middle;">${isWeekly ? 'WEEKLY' : 'DAILY'} BRIEF</span>
+                  <span style="color:#64748b;font-size:22px;font-weight:300;margin-left:4px;">|</span>
+                  <span style="color:#cbd5e1;font-size:13px;font-weight:500;margin-left:8px;vertical-align:middle;">${isWeekly ? 'WEEKLY' : 'DAILY'} BRIEF</span>
                 </td>
                 <td style="text-align:right;">
-                  <span style="color:#475569;font-size:11px;">${dateStr}</span>
+                  <span style="color:#94a3b8;font-size:11px;">${dateStr}</span>
                 </td>
               </tr>
             </table>
@@ -387,23 +387,23 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
                 <td style="background:#0f172a;border-radius:8px;padding:14px 18px;">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
-                      <td style="color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:1px;padding-bottom:8px;" colspan="4">MARKET PULSE</td>
+                      <td style="color:#cbd5e1;font-size:11px;font-weight:600;letter-spacing:1px;padding-bottom:8px;" colspan="4">MARKET PULSE</td>
                     </tr>
                     <tr>
                       <td style="width:25%;">
-                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">SIGNALS</div>
+                        <div style="color:#94a3b8;font-size:10px;letter-spacing:0.5px;">SIGNALS</div>
                         <div style="color:#f1f5f9;font-size:18px;font-weight:700;">${signals.length}</div>
                       </td>
                       <td style="width:25%;">
-                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">BULLISH</div>
+                        <div style="color:#94a3b8;font-size:10px;letter-spacing:0.5px;">BULLISH</div>
                         <div style="color:#22c55e;font-size:18px;font-weight:700;">${bullishCount}</div>
                       </td>
                       <td style="width:25%;">
-                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">BEARISH</div>
+                        <div style="color:#94a3b8;font-size:10px;letter-spacing:0.5px;">BEARISH</div>
                         <div style="color:#ef4444;font-size:18px;font-weight:700;">${bearishCount}</div>
                       </td>
                       <td style="width:25%;">
-                        <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;">CONTRACTS</div>
+                        <div style="color:#94a3b8;font-size:10px;letter-spacing:0.5px;">CONTRACTS</div>
                         <div style="color:#60a5fa;font-size:18px;font-weight:700;">${contractCount}</div>
                       </td>
                     </tr>
@@ -419,7 +419,7 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
         <tr>
           <td style="padding:4px 24px 12px;">
             <div style="background:#0f172a;border-radius:6px;padding:10px 18px;overflow:hidden;">
-              <span style="color:#475569;font-size:10px;font-weight:600;letter-spacing:1px;margin-right:12px;">TICKERS IN PLAY</span>
+              <span style="color:#94a3b8;font-size:10px;font-weight:600;letter-spacing:1px;margin-right:12px;">TICKERS IN PLAY</span>
               ${tickerStrip}
             </div>
           </td>
@@ -428,7 +428,7 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
         <!-- SECTION LABEL -->
         <tr>
           <td style="padding:16px 24px 8px;">
-            <span style="color:#64748b;font-size:11px;font-weight:700;letter-spacing:1.5px;">TOP SIGNALS — ${period.toUpperCase()}</span>
+            <span style="color:#cbd5e1;font-size:11px;font-weight:700;letter-spacing:1.5px;">TOP SIGNALS — ${period.toUpperCase()}</span>
           </td>
         </tr>
 
@@ -439,7 +439,7 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
         ${totalAvailable > signals.length ? `
         <tr>
           <td style="padding:4px 24px 12px;">
-            <div style="color:#475569;font-size:12px;text-align:center;">
+            <div style="color:#94a3b8;font-size:12px;text-align:center;">
               + ${totalAvailable - signals.length} more signals on your dashboard
             </div>
           </td>
@@ -460,10 +460,10 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
         </tr>
         <tr>
           <td style="padding:16px 24px;text-align:center;">
-            <p style="color:#475569;font-size:11px;margin:0;line-height:1.6;">
-              Congressional intelligence for investors · <a href="${appUrl}/settings" style="color:#475569;text-decoration:underline;">Manage preferences</a>
+            <p style="color:#94a3b8;font-size:11px;margin:0;line-height:1.6;">
+              Congressional intelligence for investors · <a href="${appUrl}/settings" style="color:#94a3b8;text-decoration:underline;">Manage preferences</a>
             </p>
-            <p style="color:#334155;font-size:10px;margin:6px 0 0;">
+            <p style="color:#64748b;font-size:10px;margin:6px 0 0;">
               Not financial advice. Past legislative activity is not indicative of future market performance.
             </p>
           </td>
