@@ -280,7 +280,7 @@ function buildSignalCard(signal: any, index: number, appUrl: string): string {
   // Ticker pills
   const tickerPills = tickers.length > 0
     ? tickers.slice(0, 5).map(t =>
-      `<span style="background:#172554;color:#60a5fa;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:600;font-family:monospace;margin-right:4px;">$${t}</span>`
+      `<span style="background:#1e3a5f;color:#93c5fd;padding:3px 10px;border-radius:3px;font-size:13px;font-weight:700;font-family:monospace;margin-right:5px;">$${t}</span>`
     ).join('')
     : ''
 
@@ -461,9 +461,14 @@ function buildDigestEmail(signals: any[], isWeekly: boolean, totalAvailable: num
         <tr>
           <td style="padding:16px 24px;text-align:center;">
             <p style="color:#94a3b8;font-size:11px;margin:0;line-height:1.6;">
-              Congressional intelligence for investors · <a href="${appUrl}/settings" style="color:#94a3b8;text-decoration:underline;">Manage preferences</a>
+              Congressional intelligence for investors
             </p>
-            <p style="color:#64748b;font-size:10px;margin:6px 0 0;">
+            <p style="color:#94a3b8;font-size:11px;margin:8px 0 0;line-height:1.6;">
+              <a href="${appUrl}/settings" style="color:#94a3b8;text-decoration:underline;">Manage preferences</a>
+              &nbsp;&nbsp;·&nbsp;&nbsp;
+              <a href="${appUrl}/settings" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a>
+            </p>
+            <p style="color:#64748b;font-size:10px;margin:8px 0 0;">
               Not financial advice. Past legislative activity is not indicative of future market performance.
             </p>
           </td>
