@@ -3,7 +3,7 @@ export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
 import { createAdminClient, createServerSupabaseClient } from '@/lib/supabase/server'
-import { fetchAllRecent } from '@/lib/congress-api'
+import { fetchRecentBills } from '@/lib/congress-api'
 import { analyzeBatch, filterForMarketRelevance } from '@/lib/gemini-analysis'
 
 /**
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
         }
 
         if (!skipPoll) {
-          const rawItems = await fetchAllRecent()
+          const rawItems = await fetchRecentBills()
           console.log(`[signals] Fetched ${rawItems?.length ?? 0} items from Congress.gov`)
 
           if ((rawItems?.length ?? 0) > 0) {
@@ -167,7 +167,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ signals: idData ?? [], hasMore: false, totalCount: idData?.length ?? 0 })
     }
 
-    // Date range: custom range overrides default 90-day window
+    // Date range filtering:
+    // - dateFrom/dateTo: user-selected range (filters on event_date for precision)
+    // - Default: 90-day window on created_at (when signal was added to HillSignal)
+    //   This ensures backfilled historical contracts appear (their event_date may be old)
     const dateFrom = searchParams?.get?.('dateFrom')
     const dateTo = searchParams?.get?.('dateTo')
     const defaultFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
@@ -183,19 +186,25 @@ export async function GET(request: Request) {
         .not('affected_sectors', 'eq', '{}')      // Must have at least one affected sector
     }
 
-    // Apply event_date window (custom range or default 90 days)
-    query = query
-      .gte('event_date', dateFrom || defaultFrom)
-
-    if (dateTo) {
-      // Add 1 day to dateTo to make it inclusive of the end date
-      const endDate = new Date(dateTo)
-      endDate.setDate(endDate.getDate() + 1)
-      query = query.lt('event_date', endDate.toISOString())
+    // Apply date window
+    if (dateFrom || dateTo) {
+      // User explicitly set a date range — filter on event_date (the actual event date)
+      if (dateFrom) {
+        query = query.gte('event_date', dateFrom)
+      }
+      if (dateTo) {
+        const endDate = new Date(dateTo)
+        endDate.setDate(endDate.getDate() + 1)
+        query = query.lt('event_date', endDate.toISOString())
+      }
+    } else {
+      // Default: show signals added in the last 90 days (by created_at)
+      // This keeps backfilled contracts visible even if their event_date is old
+      query = query.gte('created_at', defaultFrom)
     }
 
     query = query
-      .order('event_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)          // Inclusive range
 
     if (sector && sector !== 'all') {
