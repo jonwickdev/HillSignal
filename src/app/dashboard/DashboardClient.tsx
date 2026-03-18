@@ -798,9 +798,12 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                     <div key={signal.id} className={`flex items-center gap-3 px-4 py-3 bg-hill-dark rounded-lg border transition-all hover:border-hill-orange/30 ${
                       isFavorited ? 'border-yellow-500/40' : 'border-hill-border'
                     }`}>
-                      {/* Date */}
+                      {/* Date — use created_at for bills (event_date can be stale), event_date for contracts */}
                       <span className="text-xs text-hill-muted font-mono w-16 shrink-0">
-                        {signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                        {(() => {
+                          const d = signal?.event_type === 'contract_award' ? signal?.event_date : (signal?.created_at || signal?.event_date)
+                          return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
+                        })()}
                       </span>
                       {/* Type badge */}
                       <span className="px-2 py-0.5 bg-hill-gray rounded text-xs text-hill-muted shrink-0 w-24 text-center">
@@ -891,7 +894,10 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                                 <span className="text-[11px] text-hill-orange font-mono">{signal.bill_number}</span>
                               )}
                               <span className="text-[11px] text-hill-muted font-mono">
-                                {signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                                {(() => {
+                                  const d = signal?.event_type === 'contract_award' ? signal?.event_date : (signal?.created_at || signal?.event_date)
+                                  return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
+                                })()}
                               </span>
                             </div>
                             <Link href={`/signals/${signal?.id ?? ''}`} className="hover:text-hill-orange transition-colors">

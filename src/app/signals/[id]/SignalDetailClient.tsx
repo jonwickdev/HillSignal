@@ -68,8 +68,8 @@ export default function SignalDetailClient({ signal, connectedSignals = [], isAu
           <Link href={isAuthenticated ? '/dashboard' : '/'} className="text-xl font-bold text-hill-white">Hill<span className="text-hill-orange">Signal</span></Link>
           <div className="flex items-center gap-2">
             <button onClick={handleShare}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-hill-muted hover:text-hill-white bg-hill-dark border border-hill-border hover:border-hill-orange/30 transition-all">
-              {copied ? <><Check size={12} className="text-hill-green" /> Copied</> : <><Share2 size={12} /> Share</>}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-hill-orange bg-hill-orange/10 border border-hill-orange/30 hover:bg-hill-orange/20 hover:border-hill-orange/50 transition-all">
+              {copied ? <><Check size={12} className="text-hill-green" /> Copied!</> : <><Share2 size={12} /> Share</>}
             </button>
             {isAuthenticated ? (
               <Link href="/dashboard">

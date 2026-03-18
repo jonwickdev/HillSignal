@@ -126,8 +126,21 @@ export async function fetchRecentBills(fromDateTime?: string, limit: number = 20
   const bills: any[] = data?.bills ?? []
   console.log(`[congress] Got ${bills?.length ?? 0} bills from list endpoint`)
 
+  // Filter out stale bills — if the latest action is >6 months old, skip it.
+  // Congress.gov returns bills updated recently but some have very old action dates.
+  const sixMonthsAgo = new Date()
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+  const freshBills = (bills ?? []).filter((bill: any) => {
+    const actionDate = bill?.latestAction?.actionDate ?? bill?.updateDate
+    if (!actionDate) return true // keep if no date
+    const d = new Date(actionDate)
+    if (isNaN(d.getTime())) return true // keep if unparseable
+    return d >= sixMonthsAgo
+  })
+  console.log(`[congress] ${freshBills.length}/${bills.length} bills passed staleness filter (>6 months removed)`)
+
   // Use list data directly — NO individual detail fetches (saves 10-20 HTTP calls)
-  return (bills ?? []).map((bill: any) => {
+  return (freshBills ?? []).map((bill: any) => {
     const policyArea = bill?.policyArea?.name ?? null
     const billNumber = `${bill?.type ?? ''}${bill?.number ?? ''}`
     const chamber = (bill?.originChamber ?? 'house')?.toLowerCase?.()
