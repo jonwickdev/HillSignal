@@ -1,0 +1,27 @@
+➤ YN0000: · Yarn 4.13.0
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + @stripe/stripe-js@npm:8.11.0, @supabase/ssr@npm:0.9.0, @supabase/supabase-js@npm:2.99.3, lucide-react@npm:0.577.0, stripe@npm:20.4.1, and 12 more.
+➤ YN0085: │ - lucide-react@npm:0.446.0, typescript@npm:5.2.2, typescript@patch:typescript@npm%3A5.2.2#optional!builtin<compat/typescript>::version=5.2.2&hash=f3b441
+➤ YN0000: └ Completed in 0s 534ms
+➤ YN0000: ┌ Post-resolution validation
+➤ YN0060: │ @typescript-eslint/parser is listed by your project with version 7.0.0 (p6cb6c0), which doesn't satisfy what @typescript-eslint/eslint-plugin requests (^6.0.0-alpha).
+➤ YN0060: │ eslint is listed by your project with version 9.24.0 (pe6e000), which doesn't satisfy what @typescript-eslint/eslint-plugin and other dependencies request (^8.57.0).
+➤ YN0002: │ app@workspace:. doesn't provide prettier (pd88b5f), requested by eslint-plugin-prettier.
+➤ YN0086: │ Some peer dependencies are incorrectly met by your project; run yarn explain peer-requirements <hash> for details, where <hash> is the six-letter p-prefixed code.
+➤ YN0086: │ Some peer dependencies are incorrectly met by dependencies; run yarn explain peer-requirements for details.
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 14 packages were added to the project (+ 49.33 MiB).
+➤ YN0000: └ Completed in 1s 326ms
+➤ YN0000: ┌ Link step
+➤ YN0000: └ Completed in 3s 544ms
+➤ YN0000: · Done with warnings in 5s 582ms
+Environment variables loaded from .env
+  ▲ Next.js 14.2.28
+  - Local:        http://localhost:3000
+  - Environments: .env
+  - Experiments (use with caution):
+    · outputFileTracingRoot
+
+ ✓ Starting...
+ ✓ Ready in 1437ms
