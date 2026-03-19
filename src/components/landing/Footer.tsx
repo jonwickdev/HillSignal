@@ -9,7 +9,7 @@ export default function Footer() {
               Hill<span className="text-hill-orange">Signal</span>
             </h3>
             <p className="text-hill-muted text-sm max-w-sm">
-              Real-time Congressional activity intelligence for informed investors.
+              Congressional activity intelligence for informed investors.
               Know what lawmakers know, before the market does.
             </p>
           </div>

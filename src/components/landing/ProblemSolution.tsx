@@ -43,7 +43,7 @@ export default function ProblemSolution() {
                 Insiders Have the Edge
               </h3>
               <p className="text-hill-muted text-sm">
-                Lobbyists, DC insiders, and institutions pay thousands for real-time political
+                Lobbyists, DC insiders, and institutions pay thousands for political
                 intelligence. Retail investors get table scraps.
               </p>
             </Card>
@@ -56,7 +56,7 @@ export default function ProblemSolution() {
             The Solution: <span className="text-hill-green">HillSignal</span>
           </h2>
           <p className="text-hill-muted text-center max-w-2xl mx-auto mb-12">
-            We monitor Congress so you don't have to. Real-time signals translated into
+            We monitor Congress so you don't have to. Daily signals translated into
             actionable market intelligence.
           </p>
 
@@ -68,11 +68,11 @@ export default function ProblemSolution() {
                 </svg>
               </div>
               <h3 className="text-hill-white font-semibold text-lg mb-2">
-                Real-Time Signals
+                Daily Signals
               </h3>
               <p className="text-hill-muted text-sm">
-                Get notified within minutes of significant congressional activity. New bills,
-                federal contract awards, legislative actions — delivered to your inbox.
+                Stay ahead of significant congressional activity. New bills,
+                federal contract awards, legislative actions — delivered to your inbox daily.
               </p>
             </Card>
 

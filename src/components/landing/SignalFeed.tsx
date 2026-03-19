@@ -11,7 +11,7 @@ interface FeaturedSignal {
   summary: string | null
   sentiment: string | null
   impact_score: number | null
-  affected_tickers: string[] | null
+  tickers: string[] | null
   affected_sectors: string[] | null
   event_type: string | null
   event_date: string | null
@@ -57,7 +57,7 @@ export default function SignalFeed({ signals }: { signals: FeaturedSignal[] }) {
             See What Congress Sees
           </h2>
           <p className="text-hill-muted max-w-2xl mx-auto">
-            Real-time intelligence from Congressional bills, federal contracts, and legislative actions.
+            AI-powered intelligence from Congressional bills, federal contracts, and legislative actions.
             Translated into actionable market signals.
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function SignalFeed({ signals }: { signals: FeaturedSignal[] }) {
         {/* Signal cards grid */}
         <div className="grid md:grid-cols-2 gap-4">
           {displaySignals.map((signal, index) => {
-            const tickers = signal.affected_tickers ?? []
+            const tickers = signal.tickers ?? []
             const sectors = signal.affected_sectors ?? []
             const sentiment = signal.sentiment ?? 'neutral'
             const impactScore = signal.impact_score ?? 0

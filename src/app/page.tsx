@@ -3,6 +3,7 @@ import HeroSection from '@/components/landing/HeroSection'
 import SignalFeed from '@/components/landing/SignalFeed'
 import StatsBar from '@/components/landing/StatsBar'
 import ProblemSolution from '@/components/landing/ProblemSolution'
+import HowItWorks from '@/components/landing/HowItWorks'
 import PricingSection from '@/components/landing/PricingSection'
 import Footer from '@/components/landing/Footer'
 import { getCurrentTier, getSpotsRemaining, formatPrice, PRICING_TIERS } from '@/lib/stripe'
@@ -77,7 +78,7 @@ async function getFeaturedSignals() {
     
     const { data, error } = await adminClient
       .from('signals')
-      .select('id, title, summary, sentiment, impact_score, affected_tickers, affected_sectors, event_type, event_date, source')
+      .select('id, title, summary, sentiment, impact_score, tickers, affected_sectors, event_type, event_date, source')
       .not('full_analysis', 'is', null)
       .gte('event_date', sixMonthsAgo.toISOString().split('T')[0])
       .gte('impact_score', 5)
@@ -148,7 +149,7 @@ export default async function HomePage() {
             name: 'What is HillSignal?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'HillSignal is a Congressional activity intelligence platform for retail investors. It tracks bills, federal government contracts, and legislative votes in real-time, then uses AI to analyze their market impact — including affected stock tickers, sectors, and sentiment.',
+              text: 'HillSignal is a Congressional activity intelligence platform for retail investors. It tracks bills, federal government contracts, and legislative activity, then uses AI to analyze their market impact — including affected stock tickers, sectors, and sentiment.',
             },
           },
           {
@@ -201,6 +202,8 @@ export default async function HomePage() {
         <StatsBar totalSignals={totalSignals} sectorCount={12} />
         
         <ProblemSolution />
+        
+        <HowItWorks />
         
         <section id="pricing">
           <PricingSection

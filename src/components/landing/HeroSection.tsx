@@ -36,7 +36,7 @@ export default function HeroSection({ spotsRemaining, currentPrice, tierName }: 
         
         {/* Subheadline */}
         <p className="text-xl md:text-2xl text-hill-muted mb-8 max-w-2xl mx-auto">
-          Real-time Congressional activity signals. Know what lawmakers know,
+          AI-analyzed Congressional activity signals. Know what lawmakers know,
           <span className="text-hill-text"> before the market does.</span>
         </p>
         
