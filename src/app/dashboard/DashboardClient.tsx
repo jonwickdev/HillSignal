@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import { createClient } from '@/lib/supabase/client'
 import type { Signal } from '@/lib/types'
+import { generateSignalSlug } from '@/lib/slug'
 import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search, User, List, BarChart3, Calendar, SlidersHorizontal, DollarSign, Zap, FileText, Landmark } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
@@ -622,7 +623,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                   const isContract = signal.event_type === 'contract_award'
                   const rawAmount = isContract && signal.raw_data?.total_obligation ? Number(signal.raw_data.total_obligation) : null
                   return (
-                    <Link key={signal.id} href={`/signals/${signal.id}`}
+                    <Link key={signal.id} href={`/signals/${generateSignalSlug(signal.title ?? '', signal.id)}`}
                       className={`bg-hill-dark rounded-lg p-5 border transition-all hover:border-hill-orange/50 group ${
                         isContract ? 'border-l-2 border-l-hill-blue border-hill-border' : 'border-hill-border'
                       }`}>
@@ -858,7 +859,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                         {formatEventType(signal?.event_type ?? 'bill')}
                       </span>
                       {/* Title — clickable */}
-                      <Link href={`/signals/${signal.id}`} className="text-sm font-medium text-hill-white truncate flex-1 hover:text-hill-orange transition-colors">
+                      <Link href={`/signals/${generateSignalSlug(signal.title ?? '', signal.id)}`} className="text-sm font-medium text-hill-white truncate flex-1 hover:text-hill-orange transition-colors">
                         {fixTitleDollars(signal.title ?? '')}
                       </Link>
                       {/* Bill number */}
@@ -951,7 +952,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                                 <span className="px-2 py-0.5 bg-hill-orange/15 text-hill-orange text-xs font-bold rounded uppercase tracking-wide animate-pulse">Updated</span>
                               )}
                             </div>
-                            <Link href={`/signals/${signal?.id ?? ''}`} className="hover:text-hill-orange transition-colors">
+                            <Link href={`/signals/${generateSignalSlug(signal?.title ?? '', signal?.id ?? '')}`} className="hover:text-hill-orange transition-colors">
                               <h2 className="text-lg font-semibold text-hill-white leading-snug">{fixTitleDollars(signal?.title ?? 'Untitled')}</h2>
                             </Link>
                             {recipient && (
@@ -1049,7 +1050,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                             </div>
                           )}
                           <div className="flex items-center gap-4 pt-2">
-                            <Link href={`/signals/${signal?.id ?? ''}`} className="text-sm text-hill-orange hover:underline flex items-center gap-1">
+                            <Link href={`/signals/${generateSignalSlug(signal?.title ?? '', signal?.id ?? '')}`} className="text-sm text-hill-orange hover:underline flex items-center gap-1">
                               Full Detail Page <ExternalLink size={12} />
                             </Link>
                             {signal?.source_url && (

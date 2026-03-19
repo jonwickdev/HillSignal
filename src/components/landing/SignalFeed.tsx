@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Card from '@/components/ui/Card'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import Link from 'next/link'
+import { generateSignalSlug } from '@/lib/slug'
 
 interface FeaturedSignal {
   id: string
@@ -72,7 +73,7 @@ export default function SignalFeed({ signals }: { signals: FeaturedSignal[] }) {
             const sourceLabel = signal.event_type === 'contract' ? 'Federal Contract' : signal.event_type === 'bill' ? 'Congressional Bill' : (signal.event_type ?? 'Signal')
             
             return (
-              <Link href={`/signals/${signal.id}`} key={signal.id}>
+              <Link href={`/signals/${generateSignalSlug(signal.title, signal.id)}`} key={signal.id}>
                 <Card
                   hover
                   className={`cursor-pointer transition-all duration-300 h-full ${

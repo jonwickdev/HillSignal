@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { Signal } from '@/lib/types'
 import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText, Link2, DollarSign, FileBarChart, Share2, Check } from 'lucide-react'
+import { generateSignalSlug } from '@/lib/slug'
 
 /** Fix malformed dollar amounts in titles (e.g., "$10410.5M" → "$10.4B") */
 function fixTitleDollars(title: string): string {
@@ -63,7 +64,7 @@ export default function SignalDetailClient({ signal, connectedSignals = [], isAu
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [shareOpen])
 
-  const shareUrl = `https://hillsignal.com/signals/${signal.id}`
+  const shareUrl = `https://hillsignal.com/signals/${generateSignalSlug(signal.title ?? '', signal.id)}`
   const shareTitle = signal?.title ?? 'Congressional Signal'
   const shareText = `${shareTitle} — HillSignal`
 
@@ -291,7 +292,7 @@ export default function SignalDetailClient({ signal, connectedSignals = [], isAu
                 const isStrongLink = (cs._connectionScore ?? 0) >= 10
 
                 return (
-                  <Link key={cs.id} href={`/signals/${cs.id}`}>
+                  <Link key={cs.id} href={`/signals/${generateSignalSlug(cs.title ?? '', cs.id)}`}>
                     <Card hover className="p-4 group cursor-pointer transition-all">
                       <div className="flex items-start gap-3">
                         {/* Type icon */}

@@ -3,18 +3,20 @@ export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase/server'
+import { extractIdFromSlug, generateSignalSlug } from '@/lib/slug'
 import SignalDetailClient from './SignalDetailClient'
 
 /**
  * Generate dynamic OG tags for signal detail pages.
  * Uses admin client so metadata works even for crawlers (no auth cookie).
  */
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const id = extractIdFromSlug(slug)
   const admin = createAdminClient()
   const { data: signal } = await admin
     .from('signals')
-    .select('title, summary, sentiment, impact_score, affected_sectors, event_type')
+    .select('id, title, summary, sentiment, impact_score, affected_sectors, event_type')
     .eq('id', id ?? '')
     .single()
 
@@ -22,6 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return { title: 'Signal Not Found' }
   }
 
+  const canonicalSlug = generateSignalSlug(signal.title, signal.id)
   const sentimentEmoji = signal.sentiment === 'bullish' ? '🟢' : signal.sentiment === 'bearish' ? '🔴' : '⚪'
   const title = `${sentimentEmoji} ${signal.title}`
   const description = signal.summary?.slice(0, 200) || 'Congressional activity signal analysis on HillSignal.'
@@ -30,14 +33,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description,
     alternates: {
-      canonical: `https://hillsignal.com/signals/${id}`,
+      canonical: `https://hillsignal.com/signals/${canonicalSlug}`,
     },
     openGraph: {
       title,
       description,
       type: 'article',
       siteName: 'HillSignal',
-      url: `https://hillsignal.com/signals/${id}`,
+      url: `https://hillsignal.com/signals/${canonicalSlug}`,
       images: [{ url: '/og-image.png', width: 1200, height: 630 }],
     },
     twitter: {
@@ -49,8 +52,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 }
 
-export default async function SignalDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export default async function SignalDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const id = extractIdFromSlug(slug)
 
   // Use admin client so the page is readable by anyone (public, crawlers, LLMs).
   // Auth is optional — logged-in users get extra features (favorites, dismiss).
@@ -89,7 +93,7 @@ export default async function SignalDetailPage({ params }: { params: Promise<{ i
             dateModified: signal.updated_at || signal.created_at,
             author: { '@type': 'Organization', name: 'HillSignal', url: 'https://hillsignal.com' },
             publisher: { '@type': 'Organization', name: 'HillSignal', url: 'https://hillsignal.com', logo: { '@type': 'ImageObject', url: 'https://hillsignal.com/og-image.png' } },
-            mainEntityOfPage: { '@type': 'WebPage', '@id': `https://hillsignal.com/signals/${signal.id}` },
+            mainEntityOfPage: { '@type': 'WebPage', '@id': `https://hillsignal.com/signals/${generateSignalSlug(signal.title, signal.id)}` },
             about: [
               ...(signal.affected_sectors ?? []).map((s: string) => ({ '@type': 'Thing', name: s })),
               ...(signal.tickers ?? []).map((t: string) => ({ '@type': 'FinancialProduct', name: t, tickerSymbol: t })),

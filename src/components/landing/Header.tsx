@@ -23,6 +23,12 @@ export default function Header() {
           <a href="#pricing" className="text-hill-muted hover:text-hill-white transition-colors">
             Pricing
           </a>
+          <Link href="/about" className="text-hill-muted hover:text-hill-white transition-colors">
+            About
+          </Link>
+          <Link href="/blog" className="text-hill-muted hover:text-hill-white transition-colors">
+            Blog
+          </Link>
           <Link href="/login" className="text-hill-muted hover:text-hill-white transition-colors">
             Login
           </Link>
@@ -64,6 +70,20 @@ export default function Header() {
             >
               Pricing
             </a>
+            <Link
+              href="/about"
+              className="block text-hill-muted hover:text-hill-white transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              About
+            </Link>
+            <Link
+              href="/blog"
+              className="block text-hill-muted hover:text-hill-white transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Blog
+            </Link>
             <Link
               href="/login"
               className="block text-hill-muted hover:text-hill-white transition-colors"
