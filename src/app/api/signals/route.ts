@@ -183,10 +183,15 @@ export async function GET(request: Request) {
       .select('*', { count: 'exact' })
 
     // Quality filters — only for 'analyzed' view (default)
+    // Staleness guard: analyzed view excludes signals with event_date > 2 years old.
+    // This prevents USAspending "modified old contract" leaks from appearing in the
+    // curated feed. Users can still find old data via search or tracker view.
     if (view !== 'tracker') {
+      const twoYearsAgo = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString()
       query = query
         .gt('impact_score', 3)                    // Only show signals with real impact
         .not('affected_sectors', 'eq', '{}')      // Must have at least one affected sector
+        .gte('event_date', twoYearsAgo)           // Event not older than 2 years
     }
 
     // Apply date window
