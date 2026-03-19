@@ -1,6 +1,7 @@
 import Header from '@/components/landing/Header'
 import HeroSection from '@/components/landing/HeroSection'
 import SignalFeed from '@/components/landing/SignalFeed'
+import StatsBar from '@/components/landing/StatsBar'
 import ProblemSolution from '@/components/landing/ProblemSolution'
 import PricingSection from '@/components/landing/PricingSection'
 import Footer from '@/components/landing/Footer'
@@ -35,11 +36,38 @@ async function getPurchaseCount(): Promise<number> {
   }
 }
 
+/**
+ * Get total signal count from database for stats display
+ */
+async function getSignalCount(): Promise<number> {
+  try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return 0
+    }
+    const { createAdminClient } = await import('@/lib/supabase/server')
+    const adminClient = createAdminClient()
+    const { count, error } = await adminClient
+      .from('signals')
+      .select('id', { count: 'exact', head: true })
+    if (error) {
+      console.error('Error fetching signal count:', error)
+      return 0
+    }
+    return count ?? 0
+  } catch (error) {
+    console.error('Signal count fetch failed:', error)
+    return 0
+  }
+}
+
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalidate every 60 seconds
 
 export default async function HomePage() {
-  const purchaseCount = await getPurchaseCount()
+  const [purchaseCount, totalSignals] = await Promise.all([
+    getPurchaseCount(),
+    getSignalCount(),
+  ])
   const currentTier = getCurrentTier(purchaseCount)
   const spotsRemaining = getSpotsRemaining(purchaseCount)
   
@@ -132,6 +160,8 @@ export default async function HomePage() {
         />
         
         <SignalFeed />
+        
+        <StatsBar totalSignals={totalSignals} sectorCount={12} />
         
         <ProblemSolution />
         

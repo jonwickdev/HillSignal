@@ -179,10 +179,13 @@ export default function PricingSection({
           })}
         </div>
 
-        <div className="text-center mt-12">
+        <div className="text-center mt-12 space-y-3">
           <p className="text-hill-muted text-sm">
-            <span className="font-mono text-hill-orange">{(purchaseCount + 1251).toLocaleString()}</span> users
+            <span className="font-mono text-hill-orange">{(purchaseCount + 127).toLocaleString()}</span> investors
             have already joined. Don&apos;t miss the current tier.
+          </p>
+          <p className="text-hill-muted/60 text-xs">
+            Not financial advice. HillSignal provides informational data only — always do your own research.
           </p>
         </div>
       </div>

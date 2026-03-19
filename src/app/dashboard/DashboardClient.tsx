@@ -850,7 +850,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                           return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
                         })()}
                       </span>
-                      {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 48 * 60 * 60 * 1000 && (
+                      {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 24 * 60 * 60 * 1000 && (
                         <span className="px-2 py-0.5 bg-hill-orange/15 text-hill-orange text-xs font-bold rounded uppercase tracking-wide shrink-0 animate-pulse">Updated</span>
                       )}
                       {/* Type badge */}
@@ -947,7 +947,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                                   return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
                                 })()}
                               </span>
-                              {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 48 * 60 * 60 * 1000 && (
+                              {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 24 * 60 * 60 * 1000 && (
                                 <span className="px-2 py-0.5 bg-hill-orange/15 text-hill-orange text-xs font-bold rounded uppercase tracking-wide animate-pulse">Updated</span>
                               )}
                             </div>
