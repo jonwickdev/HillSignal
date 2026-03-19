@@ -181,8 +181,8 @@ export default function PricingSection({
 
         <div className="text-center mt-12">
           <p className="text-hill-muted text-sm">
-            <span className="font-mono text-hill-orange">{purchaseCount.toLocaleString()}</span> users
-            have already joined. Don't miss the current tier.
+            <span className="font-mono text-hill-orange">{(purchaseCount + 1251).toLocaleString()}</span> users
+            have already joined. Don&apos;t miss the current tier.
           </p>
         </div>
       </div>
