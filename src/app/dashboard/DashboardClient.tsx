@@ -504,7 +504,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
             <div className="flex bg-hill-dark rounded-lg border border-hill-border p-0.5 shrink-0">
               {DATE_PRESETS.filter(p => p.key !== 'custom').map((p) => (
                 <button key={p.key} onClick={() => setDateRange(p.key)}
-                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-medium whitespace-nowrap transition-all ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-xs font-medium whitespace-nowrap transition-all ${
                     dateRange === p.key
                       ? 'bg-hill-orange text-white'
                       : 'text-hill-muted hover:text-hill-white'
@@ -540,22 +540,22 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
             <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('all'); setShowFavoritesOnly(false) }}
               className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-orange/40 transition-all text-left">
-              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">This Week</p>
+              <p className="text-hill-muted text-sm uppercase tracking-wider mb-0.5">This Week</p>
               <p className="text-xl font-bold text-hill-white font-mono">{stats.thisWeekSignals.toLocaleString()}</p>
             </button>
             <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('bullish'); setShowFavoritesOnly(false) }}
               className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-green/40 transition-all text-left">
-              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">Bullish</p>
+              <p className="text-hill-muted text-sm uppercase tracking-wider mb-0.5">Bullish</p>
               <p className="text-xl font-bold text-hill-green font-mono">{visibleSignals.filter(s => s.sentiment === 'bullish').length}</p>
             </button>
             <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('bearish'); setShowFavoritesOnly(false) }}
               className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-red/40 transition-all text-left">
-              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">Bearish</p>
+              <p className="text-hill-muted text-sm uppercase tracking-wider mb-0.5">Bearish</p>
               <p className="text-xl font-bold text-hill-red font-mono">{visibleSignals.filter(s => s.sentiment === 'bearish').length}</p>
             </button>
             <button onClick={() => { setSelectedType(selectedType === 'contract_award' ? 'all' : 'contract_award') }}
               className={`bg-hill-dark rounded-lg p-3 border transition-all text-left ${selectedType === 'contract_award' ? 'border-hill-blue ring-1 ring-hill-blue/30' : 'border-hill-border hover:border-hill-blue/40'}`}>
-              <p className="text-hill-muted text-[10px] uppercase tracking-wider mb-0.5">Contracts</p>
+              <p className="text-hill-muted text-sm uppercase tracking-wider mb-0.5">Contracts</p>
               <p className="text-xl font-bold text-hill-blue font-mono">{visibleSignals.filter(s => s.event_type === 'contract_award').length}</p>
             </button>
           </div>
@@ -581,28 +581,28 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                   const rawAmount = isContract && signal.raw_data?.total_obligation ? Number(signal.raw_data.total_obligation) : null
                   return (
                     <Link key={signal.id} href={`/signals/${signal.id}`}
-                      className={`bg-hill-dark rounded-lg p-4 border transition-all hover:border-hill-orange/50 group ${
+                      className={`bg-hill-dark rounded-lg p-5 border transition-all hover:border-hill-orange/50 group ${
                         isContract ? 'border-l-2 border-l-hill-blue border-hill-border' : 'border-hill-border'
                       }`}>
                       <div className="flex items-center gap-2 mb-2">
                         {isContract ? (
-                          <span className="px-1.5 py-0.5 bg-hill-blue/15 text-hill-blue text-[10px] font-bold rounded uppercase">Contract</span>
+                          <span className="px-2 py-0.5 bg-hill-blue/15 text-hill-blue text-xs font-bold rounded uppercase">Contract</span>
                         ) : (
-                          <span className="px-1.5 py-0.5 bg-hill-gray text-hill-muted text-[10px] font-bold rounded uppercase">Bill</span>
+                          <span className="px-2 py-0.5 bg-hill-gray text-hill-muted text-xs font-bold rounded uppercase">Bill</span>
                         )}
-                        <span className={`text-[10px] font-bold uppercase ${sent?.color ?? ''}`}>{sent?.label ?? 'Neutral'}</span>
+                        <span className={`text-xs font-bold uppercase ${sent?.color ?? ''}`}>{sent?.label ?? 'Neutral'}</span>
                         {rawAmount && rawAmount > 0 && (
-                          <span className="ml-auto text-xs font-mono font-bold text-hill-green">{fixTitleDollars(`$${(rawAmount / 1e6).toFixed(1)}M`)}</span>
+                          <span className="ml-auto text-sm font-mono font-bold text-hill-green">{fixTitleDollars(`$${(rawAmount / 1e6).toFixed(1)}M`)}</span>
                         )}
                       </div>
-                      <p className="text-sm font-medium text-hill-white leading-snug line-clamp-2 group-hover:text-hill-orange transition-colors">
+                      <p className="text-base font-semibold text-hill-white leading-snug line-clamp-2 group-hover:text-hill-orange transition-colors">
                         {fixTitleDollars(signal.title ?? '')}
                       </p>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-3">
                         {(signal.tickers ?? []).slice(0, 3).map((t: string) => (
-                          <span key={t} className="text-[11px] font-mono text-hill-orange">{t}</span>
+                          <span key={t} className="text-sm font-mono font-medium text-hill-orange">{t}</span>
                         ))}
-                        <span className="ml-auto text-[11px] font-mono text-hill-muted">{signal.impact_score}/10</span>
+                        <span className="ml-auto text-sm font-mono text-hill-muted">{signal.impact_score}/10</span>
                       </div>
                     </Link>
                   )
@@ -659,7 +659,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
           <div className="mb-5 bg-hill-dark/50 rounded-lg border border-hill-border p-4 space-y-3">
             {/* Sentiment + Type */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] text-hill-muted uppercase tracking-wider w-16 shrink-0">Sentiment</span>
+              <span className="text-xs text-hill-muted uppercase tracking-wider w-16 shrink-0">Sentiment</span>
               {(['all', 'bullish', 'bearish', 'neutral'] as const).map((s) => {
                 const conf = s !== 'all' ? sentimentConfig[s] : null
                 const isActive = selectedSentiment === s
@@ -676,7 +676,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                 )
               })}
               <span className="w-px h-5 bg-hill-border" />
-              <span className="text-[10px] text-hill-muted uppercase tracking-wider">Type</span>
+              <span className="text-xs text-hill-muted uppercase tracking-wider">Type</span>
               {(['all', ...eventTypes] as const).map((t) => (
                 <button key={t} onClick={() => setSelectedType(t)}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
@@ -697,11 +697,11 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
             {/* Sectors */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] text-hill-muted uppercase tracking-wider w-16 shrink-0">Sector</span>
+              <span className="text-xs text-hill-muted uppercase tracking-wider w-16 shrink-0">Sector</span>
               <div className="flex flex-wrap gap-1.5">
                 {sectors.map((sector: string) => (
                   <button key={sector} onClick={() => setSelectedSector(sector)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
                       selectedSector === sector ? 'bg-hill-orange text-white' : 'bg-hill-gray/50 text-hill-muted hover:text-hill-white'
                     }`}>
                     {sector === 'all' ? 'All' : sector}
@@ -713,7 +713,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
             {/* Active filter summary */}
             {(selectedSentiment !== 'all' || selectedType !== 'all' || selectedSector !== 'all' || showFavoritesOnly || debouncedSearch) && (
               <div className="flex items-center gap-2 pt-2 border-t border-hill-border">
-                <span className="text-[10px] text-hill-muted">Active:</span>
+                <span className="text-xs text-hill-muted">Active:</span>
                 {selectedSentiment !== 'all' && (
                   <span className="bg-hill-gray px-2 py-0.5 rounded text-xs text-hill-white flex items-center gap-1">
                     {sentimentConfig[selectedSentiment]?.label ?? selectedSentiment}
@@ -782,7 +782,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                   Showing {visibleSignals.length} of {totalCount.toLocaleString()} {viewMode === 'tracker' ? 'tracked bills' : 'analyzed signals'}
                 </span>
                 {viewMode === 'analyzed' && stats.totalSignals > stats.analyzedSignals && (
-                  <button onClick={() => setViewMode('tracker')} className="text-hill-orange hover:text-hill-orange/80 text-xs">
+                  <button onClick={() => setViewMode('tracker')} className="text-hill-orange hover:text-hill-orange/80 text-sm font-medium">
                     {(stats.totalSignals - stats.analyzedSignals).toLocaleString()} more in Tracker →
                   </button>
                 )}
@@ -795,42 +795,42 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                 {(visibleSignals ?? []).map((signal: Signal) => {
                   const isFavorited = favorites.has(signal.id)
                   return (
-                    <div key={signal.id} className={`flex items-center gap-3 px-4 py-3 bg-hill-dark rounded-lg border transition-all hover:border-hill-orange/30 ${
+                    <div key={signal.id} className={`flex items-center gap-3 px-4 py-3.5 bg-hill-dark rounded-lg border transition-all hover:border-hill-orange/30 ${
                       isFavorited ? 'border-yellow-500/40' : 'border-hill-border'
                     }`}>
                       {/* Date + Updated badge */}
-                      <span className="text-xs text-hill-muted font-mono w-16 shrink-0">
+                      <span className="text-sm text-hill-muted font-mono w-18 shrink-0">
                         {(() => {
                           const d = signal?.event_type === 'contract_award' ? signal?.event_date : (signal?.created_at || signal?.event_date)
                           return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
                         })()}
                       </span>
                       {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 48 * 60 * 60 * 1000 && (
-                        <span className="px-1.5 py-0.5 bg-hill-orange/15 text-hill-orange text-[9px] font-bold rounded uppercase tracking-wide shrink-0 animate-pulse">Updated</span>
+                        <span className="px-2 py-0.5 bg-hill-orange/15 text-hill-orange text-xs font-bold rounded uppercase tracking-wide shrink-0 animate-pulse">Updated</span>
                       )}
                       {/* Type badge */}
-                      <span className="px-2 py-0.5 bg-hill-gray rounded text-xs text-hill-muted shrink-0 w-24 text-center">
+                      <span className="px-2.5 py-1 bg-hill-gray rounded text-xs text-hill-muted shrink-0 w-24 text-center font-medium">
                         {formatEventType(signal?.event_type ?? 'bill')}
                       </span>
                       {/* Title — clickable */}
-                      <Link href={`/signals/${signal.id}`} className="text-sm text-hill-white truncate flex-1 hover:text-hill-orange transition-colors">
+                      <Link href={`/signals/${signal.id}`} className="text-sm font-medium text-hill-white truncate flex-1 hover:text-hill-orange transition-colors">
                         {fixTitleDollars(signal.title ?? '')}
                       </Link>
                       {/* Bill number */}
                       {signal.bill_number && (
-                        <span className="text-xs text-hill-orange font-mono shrink-0 hidden md:inline">{signal.bill_number}</span>
+                        <span className="text-sm text-hill-orange font-mono shrink-0 hidden md:inline">{signal.bill_number}</span>
                       )}
                       {/* Sector (first one) */}
-                      <span className="text-xs text-hill-muted shrink-0 hidden lg:inline w-28 truncate text-right">
+                      <span className="text-sm text-hill-muted shrink-0 hidden lg:inline w-28 truncate text-right">
                         {(signal.affected_sectors ?? [])[0] ?? ''}
                       </span>
                       {/* Status badge */}
                       {isAnalyzed(signal) ? (
-                        <span className="px-2 py-0.5 bg-hill-green/10 text-hill-green border border-hill-green/30 rounded text-xs shrink-0 font-medium">
+                        <span className="px-2.5 py-1 bg-hill-green/10 text-hill-green border border-hill-green/30 rounded text-xs shrink-0 font-medium">
                           Analyzed
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 bg-hill-gray text-hill-muted border border-hill-border rounded text-xs shrink-0">
+                        <span className="px-2.5 py-1 bg-hill-gray text-hill-muted border border-hill-border rounded text-xs shrink-0">
                           Tracked
                         </span>
                       )}
@@ -838,12 +838,12 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                       <button
                         onClick={(e) => { e.preventDefault(); toggleAction(signal.id, 'favorite') }}
                         disabled={actionLoading === `${signal.id}-favorite`}
-                        className={`p-1 rounded transition-all shrink-0 ${
+                        className={`p-1.5 rounded transition-all shrink-0 ${
                           isFavorited ? 'text-yellow-400' : 'text-hill-muted hover:text-yellow-400'
                         }`}
                         title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
                       >
-                        <Star size={14} className={isFavorited ? 'fill-yellow-400' : ''} />
+                        <Star size={16} className={isFavorited ? 'fill-yellow-400' : ''} />
                       </button>
                     </div>
                   )
@@ -875,42 +875,42 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                               {isContract ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-hill-blue/15 text-hill-blue text-[10px] font-bold rounded uppercase">
-                                  <Landmark size={10} /> Contract
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-hill-blue/15 text-hill-blue text-xs font-bold rounded uppercase">
+                                  <Landmark size={12} /> Contract
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-hill-gray text-hill-muted text-[10px] font-bold rounded uppercase">
-                                  <FileText size={10} /> Bill
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-hill-gray text-hill-muted text-xs font-bold rounded uppercase">
+                                  <FileText size={12} /> Bill
                                 </span>
                               )}
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${sentiment?.bg ?? ''} ${sentiment?.color ?? ''}`}>
-                                <SentimentIcon size={10} />
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold ${sentiment?.bg ?? ''} ${sentiment?.color ?? ''}`}>
+                                <SentimentIcon size={12} />
                                 {sentiment?.label ?? 'Neutral'}
                               </span>
                               {rawAmount && rawAmount > 0 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-hill-green/10 text-hill-green text-[11px] font-bold font-mono rounded">
-                                  <DollarSign size={10} />
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-hill-green/10 text-hill-green text-sm font-bold font-mono rounded">
+                                  <DollarSign size={12} />
                                   {fixTitleDollars(`$${(rawAmount / 1e6).toFixed(1)}M`).replace('$', '')}
                                 </span>
                               )}
                               {signal?.bill_number && (
-                                <span className="text-[11px] text-hill-orange font-mono">{signal.bill_number}</span>
+                                <span className="text-sm text-hill-orange font-mono font-medium">{signal.bill_number}</span>
                               )}
-                              <span className="text-[11px] text-hill-muted font-mono">
+                              <span className="text-sm text-hill-muted font-mono">
                                 {(() => {
                                   const d = signal?.event_type === 'contract_award' ? signal?.event_date : (signal?.created_at || signal?.event_date)
                                   return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
                                 })()}
                               </span>
                               {signal?.created_at && (Date.now() - new Date(signal.created_at).getTime()) < 48 * 60 * 60 * 1000 && (
-                                <span className="px-1.5 py-0.5 bg-hill-orange/15 text-hill-orange text-[9px] font-bold rounded uppercase tracking-wide animate-pulse">Updated</span>
+                                <span className="px-2 py-0.5 bg-hill-orange/15 text-hill-orange text-xs font-bold rounded uppercase tracking-wide animate-pulse">Updated</span>
                               )}
                             </div>
                             <Link href={`/signals/${signal?.id ?? ''}`} className="hover:text-hill-orange transition-colors">
-                              <h2 className="text-[15px] font-semibold text-hill-white leading-snug">{fixTitleDollars(signal?.title ?? 'Untitled')}</h2>
+                              <h2 className="text-lg font-semibold text-hill-white leading-snug">{fixTitleDollars(signal?.title ?? 'Untitled')}</h2>
                             </Link>
                             {recipient && (
-                              <p className="text-xs text-hill-muted mt-1">{recipient}</p>
+                              <p className="text-sm text-hill-muted mt-1">{recipient}</p>
                             )}
                           </div>
                           {/* Actions — compact */}
@@ -927,14 +927,14 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                           </div>
                         </div>
 
-                        {/* Tickers & sectors — compact */}
+                        {/* Tickers & sectors */}
                         {((signal?.tickers?.length ?? 0) > 0 || (signal?.affected_sectors?.length ?? 0) > 0) && (
-                          <div className="flex flex-wrap gap-1.5 mb-3">
+                          <div className="flex flex-wrap gap-2 mb-3">
                             {(signal?.tickers ?? [])?.map?.((ticker: string) => (
-                              <span key={ticker} className="bg-hill-gray px-2 py-0.5 rounded text-xs font-mono text-hill-orange font-medium">{ticker}</span>
+                              <span key={ticker} className="bg-hill-gray px-2.5 py-1 rounded text-sm font-mono text-hill-orange font-medium">{ticker}</span>
                             ))}
                             {(signal?.affected_sectors ?? [])?.map?.((sector: string) => (
-                              <span key={sector} className="bg-hill-border/50 px-2 py-0.5 rounded text-[11px] text-hill-muted">{sector}</span>
+                              <span key={sector} className="bg-hill-border/50 px-2.5 py-1 rounded text-sm text-hill-muted">{sector}</span>
                             ))}
                           </div>
                         )}
@@ -945,21 +945,21 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                         {/* Footer: impact bar + expand */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className="flex gap-px">
+                            <div className="flex gap-0.5">
                               {[...(Array(10) ?? [])]?.map?.((_: any, i: number) => (
-                                <div key={i} className={`w-1.5 h-4 rounded-sm ${
+                                <div key={i} className={`w-2 h-5 rounded-sm ${
                                   i < (signal?.impact_score ?? 0)
                                     ? (signal?.impact_score ?? 0) >= 7 ? 'bg-hill-orange' : (signal?.impact_score ?? 0) >= 4 ? 'bg-hill-green' : 'bg-hill-blue'
                                     : 'bg-hill-gray/50'
                                 }`} />
                               ))}
                             </div>
-                            <span className="text-xs font-mono text-hill-muted">{signal?.impact_score ?? 0}/10</span>
+                            <span className="text-sm font-mono text-hill-muted">{signal?.impact_score ?? 0}/10</span>
                           </div>
                           {(signal?.full_analysis || (signal?.key_takeaways?.length ?? 0) > 0) && (
                             <button onClick={() => setExpandedId(isExpanded ? null : signal?.id ?? null)}
-                              className="flex items-center gap-1 text-xs text-hill-orange hover:text-hill-orange/80 transition-colors">
-                              {isExpanded ? <><ChevronUp size={12} /> Hide</> : <><ChevronDown size={12} /> Analysis</>}
+                              className="flex items-center gap-1 text-sm text-hill-orange hover:text-hill-orange/80 transition-colors font-medium">
+                              {isExpanded ? <><ChevronUp size={14} /> Hide</> : <><ChevronDown size={14} /> Analysis</>}
                             </button>
                           )}
                         </div>
@@ -1056,7 +1056,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
         {/* Bottom DB count — subtle */}
         {!loading && stats.totalSignals > 0 && (
           <div className="mt-6 text-center">
-            <p className="text-[11px] text-hill-muted/60">
+            <p className="text-xs text-hill-muted/60">
               {stats.totalSignals.toLocaleString()} signals tracked · {stats.analyzedSignals.toLocaleString()} AI analyzed
             </p>
           </div>
