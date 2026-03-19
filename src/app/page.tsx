@@ -209,7 +209,7 @@ export default async function HomePage() {
           <PricingSection
             currentTierIndex={currentTierIndex}
             spotsRemaining={spotsRemaining}
-            purchaseCount={purchaseCount}
+            
           />
         </section>
         

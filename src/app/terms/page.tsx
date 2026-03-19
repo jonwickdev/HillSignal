@@ -50,11 +50,11 @@ export default function TermsPage() {
               <h2 className="text-xl font-semibold text-hill-white mb-4">2. Description of Service</h2>
               <p className="text-hill-muted leading-relaxed mb-4">
                 HillSignal provides a Congressional activity tracking and intelligence service designed to help investors monitor 
-                legislative activities, committee hearings, proposed legislation, and other Congressional events that may impact 
+                bills, federal contracts, proposed legislation, and other Congressional events that may impact 
                 financial markets. Our Service includes:
               </p>
               <ul className="list-disc list-inside text-hill-muted space-y-2 ml-4">
-                <li>Real-time Congressional activity monitoring and alerts</li>
+                <li>Daily Congressional activity monitoring and alerts</li>
                 <li>Market impact analysis and sentiment indicators</li>
                 <li>Sector-specific filtering and customization</li>
                 <li>Email notifications based on your preferences</li>

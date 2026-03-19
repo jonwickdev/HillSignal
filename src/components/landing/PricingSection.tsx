@@ -7,7 +7,6 @@ import Link from 'next/link'
 interface PricingSectionProps {
   currentTierIndex: number
   spotsRemaining: number
-  purchaseCount: number
 }
 
 const TIERS = [
@@ -71,7 +70,6 @@ const TIERS = [
 export default function PricingSection({
   currentTierIndex,
   spotsRemaining,
-  purchaseCount,
 }: PricingSectionProps) {
   return (
     <section className="py-20 px-4 bg-hill-dark">

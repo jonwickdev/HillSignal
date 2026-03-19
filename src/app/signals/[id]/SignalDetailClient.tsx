@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -49,16 +49,47 @@ export default function SignalDetailClient({ signal, connectedSignals = [], isAu
   const hasLegislators = (signal?.legislators?.length ?? 0) > 0
 
   const [copied, setCopied] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const shareRef = useRef<HTMLDivElement>(null)
 
-  const handleShare = async () => {
-    const url = `https://hillsignal.com/signals/${signal.id}`
+  // Close share menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(e.target as Node)) {
+        setShareOpen(false)
+      }
+    }
+    if (shareOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [shareOpen])
+
+  const shareUrl = `https://hillsignal.com/signals/${signal.id}`
+  const shareTitle = signal?.title ?? 'Congressional Signal'
+  const shareText = `${shareTitle} — HillSignal`
+
+  const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => { setCopied(false); setShareOpen(false) }, 1500)
     } catch {
       // fallback
     }
+  }
+
+  const shareToX = () => {
+    window.open(`https://x.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
+    setShareOpen(false)
+  }
+
+  const shareToReddit = () => {
+    window.open(`https://reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
+    setShareOpen(false)
+  }
+
+  const shareViaEmail = () => {
+    window.open(`mailto:?subject=${encodeURIComponent(shareText)}&body=${encodeURIComponent(`Check out this Congressional signal:\n\n${shareUrl}`)}`, '_self')
+    setShareOpen(false)
   }
 
   return (
@@ -67,10 +98,36 @@ export default function SignalDetailClient({ signal, connectedSignals = [], isAu
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href={isAuthenticated ? '/dashboard' : '/'} className="text-xl font-bold text-hill-white">Hill<span className="text-hill-orange">Signal</span></Link>
           <div className="flex items-center gap-2">
-            <button onClick={handleShare}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-hill-orange bg-hill-orange/10 border border-hill-orange/30 hover:bg-hill-orange/20 hover:border-hill-orange/50 transition-all">
-              {copied ? <><Check size={12} className="text-hill-green" /> Copied!</> : <><Share2 size={12} /> Share</>}
-            </button>
+            {/* Share dropdown */}
+            <div className="relative" ref={shareRef}>
+              <button onClick={() => setShareOpen(!shareOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-hill-orange bg-hill-orange/10 border border-hill-orange/30 hover:bg-hill-orange/20 hover:border-hill-orange/50 transition-all">
+                <Share2 size={12} /> Share
+              </button>
+              {shareOpen && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-hill-dark border border-hill-border rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button onClick={shareToX} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-hill-text hover:bg-hill-gray transition-colors">
+                    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    <span>Share on X</span>
+                  </button>
+                  <button onClick={shareToReddit} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-hill-text hover:bg-hill-gray transition-colors">
+                    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>
+                    <span>Share on Reddit</span>
+                  </button>
+                  <button onClick={shareViaEmail} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-hill-text hover:bg-hill-gray transition-colors border-t border-hill-border/50">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    <span>Email</span>
+                  </button>
+                  <button onClick={handleCopyLink} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-hill-text hover:bg-hill-gray transition-colors border-t border-hill-border/50">
+                    {copied ? (
+                      <><Check size={16} className="text-hill-green flex-shrink-0" /><span className="text-hill-green">Link copied!</span></>
+                    ) : (
+                      <><Link2 size={16} className="flex-shrink-0" /><span>Copy link</span></>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
             {isAuthenticated ? (
               <Link href="/dashboard">
                 <Button variant="ghost" size="sm"><ArrowLeft size={14} className="mr-2" /> Back to Feed</Button>
