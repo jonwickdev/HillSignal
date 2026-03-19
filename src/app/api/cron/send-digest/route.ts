@@ -55,15 +55,17 @@ async function sendDigest() {
   }
 
   // Fetch recent ANALYZED signals using created_at (when HillSignal ingested).
-  // This ensures newly polled contracts/bills always appear even if their
-  // event_date (award date, introduction date) is older.
+  // Safety net: also require event_date within 2 years to prevent stale
+  // contracts/bills (USAspending returns modified old contracts as "recent").
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+  const twoYearsAgo = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: recentSignals, error: sigError } = await supabase
     .from('signals')
     .select('id, title, summary, impact_score, sentiment, affected_sectors, tickers, event_type, event_date, created_at, full_analysis, raw_data')
     .gte('created_at', sevenDaysAgo)              // Ingested in last 7 days
+    .gte('event_date', twoYearsAgo)               // Event not older than 2 years (staleness safety net)
     .not('full_analysis', 'is', null)             // Must have AI analysis
     .gt('impact_score', 3)                        // Must have real impact
     .order('impact_score', { ascending: false })

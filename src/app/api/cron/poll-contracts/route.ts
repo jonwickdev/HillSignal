@@ -113,8 +113,18 @@ async function runContractPoll(targetSector?: string) {
         mergedMap.set(c.generated_internal_id, c)
       }
     }
-    const rawContracts = Array.from(mergedMap.values())
-    console.log(`[contracts] Fetched ${genericContracts.length} generic + ${sectorContracts.length} sector-targeted → ${rawContracts.length} unique`)
+    // Filter out stale contracts — USAspending returns modified old contracts too.
+    // Only keep contracts with start_date within the last 2 years.
+    const TWO_YEARS_AGO = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const freshContracts = Array.from(mergedMap.values()).filter(c => {
+      if (!c.start_date || c.start_date < TWO_YEARS_AGO) {
+        console.log(`[contracts] Skipping stale contract: ${c.recipient_name} — start_date ${c.start_date}`)
+        return false
+      }
+      return true
+    })
+    const rawContracts = freshContracts
+    console.log(`[contracts] Fetched ${genericContracts.length} generic + ${sectorContracts.length} sector-targeted → ${mergedMap.size} unique → ${rawContracts.length} after staleness filter`)
 
     if (rawContracts.length === 0) {
       await updateContractPollState(adminClient, 0, 0, null)
