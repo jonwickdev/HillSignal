@@ -16,8 +16,10 @@ const sentimentConfig: Record<string, { color: string; bg: string; border: strin
   neutral: { color: 'text-hill-blue', bg: 'bg-hill-blue/10', border: 'border-hill-blue/30', label: 'Neutral', Icon: Minus },
 }
 
-const ANALYZED_PAGE_SIZE = 20
-const TRACKER_PAGE_SIZE = 50
+const INITIAL_FEED_SIZE = 5       // Show 5 most relevant signals on first load
+const LOAD_MORE_SIZE = 20         // Load 20 more each time user clicks "Load More"
+const TRACKER_PAGE_SIZE = 50      // Tracker view loads more since rows are compact
+const PREFETCH_SIZE = 30          // Fetch extra to allow client-side sector re-ranking
 
 const ALL_SECTORS = [
   'Healthcare', 'Technology', 'Energy', 'Finance', 'Defense',
@@ -141,7 +143,18 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
     return { dateFrom: undefined, dateTo: undefined, dateCol: 'created_at' as const }
   }, [dateRange, customDateFrom, customDateTo])
 
-  const pageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE
+  // Display limit: how many signals to show (starts at INITIAL_FEED_SIZE, grows by LOAD_MORE_SIZE)
+  const [displayLimit, setDisplayLimit] = useState(INITIAL_FEED_SIZE)
+  // User's saved feed size preference (from localStorage)
+  const [userFeedSize, setUserFeedSize] = useState(INITIAL_FEED_SIZE)
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('hillsignal_feed_size') : null
+    if (saved) {
+      const n = parseInt(saved, 10)
+      if ([5, 10, 20].includes(n)) { setUserFeedSize(n); setDisplayLimit(n) }
+    }
+  }, [])
+  const pageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : PREFETCH_SIZE
 
   // Debounce search input
   useEffect(() => {
@@ -159,6 +172,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
   // Re-fetch when search, filters, sector, view mode, or date range change
   useEffect(() => {
     if (!loading) {
+      setDisplayLimit(userFeedSize) // Reset to initial feed size on any filter change
       fetchSignals(false, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -191,7 +205,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
       }
       setError(null)
 
-      const currentPageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE
+      const currentPageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : PREFETCH_SIZE
 
       // Helper: append dateFrom/dateTo/dateCol to any URLSearchParams
       const applyDate = (p: URLSearchParams) => {
@@ -300,10 +314,21 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
   }, [debouncedSearch, selectedSentiment, selectedType, selectedSector, viewMode, signals.length, getDateParams])
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return
+    if (loadingMore) return
+
+    // First: if we have more prefetched signals to show, just bump the display limit
+    // Count filtered signals (excluding dismissed + favorites-only filter)
+    const totalFiltered = signals.length // Use raw signal count as proxy
+    if (displayLimit < totalFiltered) {
+      setDisplayLimit(prev => Math.min(prev + LOAD_MORE_SIZE, totalFiltered))
+      return
+    }
+
+    // Second: if we've shown all prefetched signals but the API has more, fetch from server
+    if (!hasMore) return
     setLoadingMore(true)
     try {
-      const currentPageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE
+      const currentPageSize = viewMode === 'tracker' ? TRACKER_PAGE_SIZE : LOAD_MORE_SIZE
       const params = new URLSearchParams()
       params.set('offset', String(signals.length))
       params.set('limit', String(currentPageSize))
@@ -323,12 +348,13 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
       setSignals(prev => [...prev, ...(data?.signals ?? [])])
       setHasMore(data?.hasMore ?? false)
+      setDisplayLimit(prev => prev + LOAD_MORE_SIZE)
     } catch (err: any) {
       console.error('Failed to load more:', err)
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, hasMore, signals.length, debouncedSearch, selectedSector, selectedSentiment, selectedType, viewMode, getDateParams])
+  }, [loadingMore, hasMore, signals.length, debouncedSearch, selectedSector, selectedSentiment, selectedType, viewMode, getDateParams, displayLimit])
 
   // Toggle favorite/dismiss
   const toggleAction = useCallback(async (signalId: string, action: 'favorite' | 'dismissed') => {
@@ -386,7 +412,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
       try {
         const params = new URLSearchParams()
         params.set('view', viewMode)
-        params.set('limit', String(viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE))
+        params.set('limit', String(viewMode === 'tracker' ? TRACKER_PAGE_SIZE : PREFETCH_SIZE))
         // Apply default date range (7d on created_at) so initial load matches filter state
         const initDate = getDateParams()
         if (initDate.dateFrom) params.set('dateFrom', initDate.dateFrom)
@@ -416,7 +442,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
             pollParams.set('refresh', 'true')
             pollParams.set('force', 'true')
             pollParams.set('view', viewMode)
-            pollParams.set('limit', String(viewMode === 'tracker' ? TRACKER_PAGE_SIZE : ANALYZED_PAGE_SIZE))
+            pollParams.set('limit', String(viewMode === 'tracker' ? TRACKER_PAGE_SIZE : PREFETCH_SIZE))
             const pollRes = await fetch(`/api/signals?${pollParams.toString()}`)
             const pollData = await pollRes?.json?.()
             if (!cancelled) {
@@ -455,11 +481,27 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
 
   // Filter: hide dismissed, optionally show favorites only
   // Sector filtering is now handled server-side
-  const visibleSignals = allSignals.filter((s: Signal) => {
+  const filteredSignals = allSignals.filter((s: Signal) => {
     if (dismissed.has(s.id)) return false
     if (showFavoritesOnly && !favorites.has(s.id)) return false
     return true
   })
+
+  // Re-rank: prioritize user's watchlist sectors, then by impact score
+  const userSectors = preferences?.sectors ?? []
+  const rankedSignals = userSectors.length > 0
+    ? [...filteredSignals].sort((a, b) => {
+        const aSectors = a.affected_sectors ?? []
+        const bSectors = b.affected_sectors ?? []
+        const aMatch = aSectors.some((s: string) => userSectors.includes(s)) ? 1 : 0
+        const bMatch = bSectors.some((s: string) => userSectors.includes(s)) ? 1 : 0
+        if (bMatch !== aMatch) return bMatch - aMatch // Watchlist sectors first
+        return (b.impact_score ?? 0) - (a.impact_score ?? 0) // Then by impact
+      })
+    : filteredSignals // No sector preferences? Keep chronological (created_at desc from API)
+
+  // Apply display limit — show only `displayLimit` signals, rest behind "Load More"
+  const visibleSignals = viewMode === 'tracker' ? rankedSignals : rankedSignals.slice(0, displayLimit)
 
   const sectors = ['all', ...ALL_SECTORS]
 
@@ -546,24 +588,24 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
             <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('bullish'); setShowFavoritesOnly(false) }}
               className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-green/40 transition-all text-left">
               <p className="text-hill-muted text-sm uppercase tracking-wider mb-0.5">Bullish</p>
-              <p className="text-xl font-bold text-hill-green font-mono">{visibleSignals.filter(s => s.sentiment === 'bullish').length}</p>
+              <p className="text-xl font-bold text-hill-green font-mono">{rankedSignals.filter(s => s.sentiment === 'bullish').length}</p>
             </button>
             <button onClick={() => { setViewMode('analyzed'); setSelectedSentiment('bearish'); setShowFavoritesOnly(false) }}
               className="bg-hill-dark rounded-lg p-3 border border-hill-border hover:border-hill-red/40 transition-all text-left">
               <p className="text-hill-muted text-sm uppercase tracking-wider mb-0.5">Bearish</p>
-              <p className="text-xl font-bold text-hill-red font-mono">{visibleSignals.filter(s => s.sentiment === 'bearish').length}</p>
+              <p className="text-xl font-bold text-hill-red font-mono">{rankedSignals.filter(s => s.sentiment === 'bearish').length}</p>
             </button>
             <button onClick={() => { setSelectedType(selectedType === 'contract_award' ? 'all' : 'contract_award') }}
               className={`bg-hill-dark rounded-lg p-3 border transition-all text-left ${selectedType === 'contract_award' ? 'border-hill-blue ring-1 ring-hill-blue/30' : 'border-hill-border hover:border-hill-blue/40'}`}>
               <p className="text-hill-muted text-sm uppercase tracking-wider mb-0.5">Contracts</p>
-              <p className="text-xl font-bold text-hill-blue font-mono">{visibleSignals.filter(s => s.event_type === 'contract_award').length}</p>
+              <p className="text-xl font-bold text-hill-blue font-mono">{rankedSignals.filter(s => s.event_type === 'contract_award').length}</p>
             </button>
           </div>
         )}
 
         {/* Top Signals This Week — hero strip, only in analyzed view */}
         {!loading && !error && viewMode === 'analyzed' && dateRange === '7d' && (() => {
-          const topSignals = [...visibleSignals]
+          const topSignals = [...rankedSignals]
             .filter(s => (s.impact_score ?? 0) >= 6)
             .sort((a, b) => (b.impact_score ?? 0) - (a.impact_score ?? 0))
             .slice(0, 3)
@@ -780,6 +822,9 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
               <div className="mb-4 flex items-center justify-between text-sm">
                 <span className="text-hill-muted">
                   Showing {visibleSignals.length} of {totalCount.toLocaleString()} {viewMode === 'tracker' ? 'tracked bills' : 'analyzed signals'}
+                  {userSectors.length > 0 && viewMode !== 'tracker' && (
+                    <span className="text-hill-orange ml-1">• Prioritized for your watchlist</span>
+                  )}
                 </span>
                 {viewMode === 'analyzed' && stats.totalSignals > stats.analyzedSignals && (
                   <button onClick={() => setViewMode('tracker')} className="text-hill-orange hover:text-hill-orange/80 text-sm font-medium">
@@ -1023,11 +1068,22 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
           </>
         )}
 
-        {/* Load More button */}
-        {!loading && !error && hasMore && (
+        {/* Load More button — show if there are more signals locally or on server */}
+        {!loading && !error && (displayLimit < rankedSignals.length || hasMore) && viewMode !== 'tracker' && (
           <div className="mt-6 text-center">
             <Button variant="secondary" onClick={loadMore} loading={loadingMore} disabled={loadingMore}>
-              {loadingMore ? 'Loading...' : `Load More ${viewMode === 'tracker' ? 'Bills' : 'Signals'}`}
+              {loadingMore ? 'Loading...' : `Load More Signals`}
+            </Button>
+            <p className="text-sm text-hill-muted mt-2">
+              Showing {visibleSignals.length} of {totalCount.toLocaleString()} signals
+            </p>
+          </div>
+        )}
+        {/* Tracker view: keep original load more */}
+        {!loading && !error && hasMore && viewMode === 'tracker' && (
+          <div className="mt-6 text-center">
+            <Button variant="secondary" onClick={loadMore} loading={loadingMore} disabled={loadingMore}>
+              {loadingMore ? 'Loading...' : 'Load More Bills'}
             </Button>
           </div>
         )}

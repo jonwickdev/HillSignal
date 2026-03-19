@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, Save, Bell, Filter } from 'lucide-react'
+import { ArrowLeft, Save, Bell, Filter, LayoutGrid } from 'lucide-react'
 
 const ALL_SECTORS = [
   { id: 'Defense', name: 'Defense & Aerospace', icon: '\uD83C\uDF96\uFE0F' },
@@ -35,9 +35,19 @@ export default function SettingsClient({ userEmail, preferences }: SettingsClien
   const [highImpactAlerts, setHighImpactAlerts] = useState<boolean>(preferences?.high_impact_alerts ?? true)
   const [sectorAlerts, setSectorAlerts] = useState<boolean>(preferences?.sector_alerts ?? false)
   const [dailyDigest, setDailyDigest] = useState<boolean>(preferences?.daily_digest ?? true)
+  const [initialFeedSize, setInitialFeedSize] = useState<number>(5)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Load feed size from localStorage on mount
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('hillsignal_feed_size') : null
+    if (saved) {
+      const n = parseInt(saved, 10)
+      if ([5, 10, 20].includes(n)) setInitialFeedSize(n)
+    }
+  }, [])
 
   const toggleSector = (sectorId: string) => {
     setSectors((prev: string[]) =>
@@ -67,6 +77,12 @@ export default function SettingsClient({ userEmail, preferences }: SettingsClien
       }, { onConflict: 'user_id' })
 
       if (prefError) throw prefError
+
+      // Save feed size to localStorage (UI-only preference)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hillsignal_feed_size', String(initialFeedSize))
+      }
+
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err: any) {
@@ -106,6 +122,31 @@ export default function SettingsClient({ userEmail, preferences }: SettingsClien
                 <span className="text-xs font-medium">{sector?.name}</span>
               </button>
             ))}
+          </div>
+        </Card>
+
+        {/* Feed Display Settings */}
+        <Card className="mb-6">
+          <h2 className="text-lg font-semibold text-hill-white mb-1 flex items-center gap-2"><LayoutGrid size={18} /> Feed Display</h2>
+          <p className="text-hill-muted text-sm mb-4">Control how many signals appear when you first open the dashboard.</p>
+          <div>
+            <label className="text-sm font-medium text-hill-text block mb-2">Initial Signals to Show</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 5, label: '5 signals', desc: 'Clean & focused' },
+                { value: 10, label: '10 signals', desc: 'Balanced view' },
+                { value: 20, label: '20 signals', desc: 'Full feed' },
+              ].map((opt) => (
+                <button key={opt.value} onClick={() => setInitialFeedSize(opt.value)}
+                  className={`px-4 py-3 rounded-lg border text-center transition-all ${
+                    initialFeedSize === opt.value ? 'border-hill-orange bg-hill-orange/10 text-hill-white' : 'border-hill-border bg-hill-gray text-hill-muted'
+                  }`}>
+                  <span className="text-sm font-medium block">{opt.label}</span>
+                  <span className="text-xs text-hill-muted">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-hill-muted mt-2">You can always load more signals by clicking &quot;Load More&quot; on the dashboard.</p>
           </div>
         </Card>
 
