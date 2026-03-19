@@ -10,12 +10,15 @@ export const metadata: Metadata = {
     default: 'HillSignal — Congressional Activity Intelligence for Investors',
     template: '%s — HillSignal',
   },
-  description: 'Track Congressional bills, votes, and hearings that move markets. AI-powered analysis gives retail investors an edge — know what lawmakers know, before the market does.',
-  keywords: 'congress, congressional activity, trading signals, political investing, market intelligence, bill tracking, retail investors, stock market, legislation',
+  description: 'Track Congressional bills, federal contracts, and legislative activity that move markets. AI-powered analysis gives retail investors an edge — know what lawmakers know, before the market does.',
+  keywords: 'congress, congressional activity, trading signals, political investing, market intelligence, bill tracking, federal contracts, retail investors, stock market, legislation',
   authors: [{ name: 'HillSignal' }],
+  alternates: {
+    canonical: 'https://hillsignal.com',
+  },
   openGraph: {
     title: 'HillSignal — Congressional Activity Intelligence for Investors',
-    description: 'Track Congressional bills, votes, and hearings that move markets. AI-powered signal intelligence for retail investors.',
+    description: 'Track Congressional bills, federal contracts, and legislative activity that move markets. AI-powered signal intelligence for retail investors.',
     type: 'website',
     locale: 'en_US',
     siteName: 'HillSignal',
@@ -32,7 +35,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'HillSignal — Congressional Activity Intelligence',
-    description: 'Track Congressional bills, votes, and hearings that move markets. AI-powered signal intelligence for retail investors.',
+    description: 'Track Congressional bills, federal contracts, and legislative activity that move markets. AI-powered signal intelligence for retail investors.',
     images: ['/og-image.png'],
   },
   robots: {

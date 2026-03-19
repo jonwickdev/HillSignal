@@ -29,11 +29,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description,
+    alternates: {
+      canonical: `https://hillsignal.com/signals/${id}`,
+    },
     openGraph: {
       title,
       description,
       type: 'article',
       siteName: 'HillSignal',
+      url: `https://hillsignal.com/signals/${id}`,
       images: [{ url: '/og-image.png', width: 1200, height: 630 }],
     },
     twitter: {

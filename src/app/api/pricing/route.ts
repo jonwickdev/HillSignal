@@ -34,7 +34,6 @@ export async function GET() {
         type: tier.type,
       },
       spotsRemaining,
-      purchaseCount,
     })
   } catch (error) {
     console.error('Pricing API error:', error)

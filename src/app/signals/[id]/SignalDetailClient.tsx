@@ -103,7 +103,7 @@ export default function SignalDetailClient({ signal, connectedSignals = [], isAu
           <div className="flex items-center gap-2 text-xs text-hill-muted font-mono mb-3">
             <span className="uppercase px-2 py-0.5 bg-hill-gray rounded">{signal?.event_type ?? 'signal'}</span>
             {signal?.bill_number && <span className="text-hill-orange">{signal.bill_number}</span>}
-            <span>\u2022</span>
+            <span>•</span>
             <Clock size={12} />
             <span>{signal?.event_date ? new Date(signal.event_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown date'}</span>
             {/* Status badge */}

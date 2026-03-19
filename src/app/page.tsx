@@ -60,13 +60,50 @@ async function getSignalCount(): Promise<number> {
   }
 }
 
+/**
+ * Get 4 recent high-impact analyzed signals for the landing page feed
+ */
+async function getFeaturedSignals() {
+  try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return []
+    }
+    const { createAdminClient } = await import('@/lib/supabase/server')
+    const adminClient = createAdminClient()
+    
+    // Get signals with analysis, recent, high impact
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    
+    const { data, error } = await adminClient
+      .from('signals')
+      .select('id, title, summary, sentiment, impact_score, affected_tickers, affected_sectors, event_type, event_date, source')
+      .not('full_analysis', 'is', null)
+      .gte('event_date', sixMonthsAgo.toISOString().split('T')[0])
+      .gte('impact_score', 5)
+      .order('impact_score', { ascending: false })
+      .order('event_date', { ascending: false })
+      .limit(4)
+    
+    if (error) {
+      console.error('Error fetching featured signals:', error)
+      return []
+    }
+    return data || []
+  } catch (error) {
+    console.error('Featured signals fetch failed:', error)
+    return []
+  }
+}
+
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalidate every 60 seconds
 
 export default async function HomePage() {
-  const [purchaseCount, totalSignals] = await Promise.all([
+  const [purchaseCount, totalSignals, featuredSignals] = await Promise.all([
     getPurchaseCount(),
     getSignalCount(),
+    getFeaturedSignals(),
   ])
   const currentTier = getCurrentTier(purchaseCount)
   const spotsRemaining = getSpotsRemaining(purchaseCount)
@@ -127,7 +164,7 @@ export default async function HomePage() {
             name: 'What Congressional data does HillSignal analyze?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'HillSignal analyzes data from Congress.gov (bills, votes, hearings, committee actions) and USAspending.gov (federal contract awards). The AI identifies which stocks and sectors are affected, assigns market sentiment (bullish/bearish/neutral), and scores the potential impact from 1-10.',
+              text: 'HillSignal analyzes data from Congress.gov (bills and legislative activity) and USAspending.gov (federal contract awards). The AI identifies which stocks and sectors are affected, assigns market sentiment (bullish/bearish/neutral), and scores the potential impact from 1-10.',
             },
           },
           {
@@ -159,7 +196,7 @@ export default async function HomePage() {
           tierName={currentTier.name}
         />
         
-        <SignalFeed />
+        <SignalFeed signals={featuredSignals} />
         
         <StatsBar totalSignals={totalSignals} sectorCount={12} />
         

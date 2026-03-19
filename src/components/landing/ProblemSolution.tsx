@@ -10,7 +10,7 @@ export default function ProblemSolution() {
             The Problem: <span className="text-hill-red">Information Asymmetry</span>
           </h2>
           <p className="text-hill-muted text-center max-w-2xl mx-auto mb-12">
-            Congress holds hearings. Laws get drafted. Markets move. By the time you read about it,
+            Congress passes bills. Federal contracts get awarded. Markets move. By the time you read about it,
             the smart money has already acted.
           </p>
 
@@ -32,7 +32,7 @@ export default function ProblemSolution() {
                 Information is Fragmented
               </h3>
               <p className="text-hill-muted text-sm">
-                Committee hearings, floor votes, amendments — scattered across dozens of sources.
+                Bills, federal contracts, legislative actions — scattered across dozens of sources.
                 Impossible to track manually.
               </p>
             </Card>
@@ -71,8 +71,8 @@ export default function ProblemSolution() {
                 Real-Time Signals
               </h3>
               <p className="text-hill-muted text-sm">
-                Get notified within minutes of significant congressional activity. Committee votes,
-                floor actions, key amendments — delivered instantly.
+                Get notified within minutes of significant congressional activity. New bills,
+                federal contract awards, legislative actions — delivered to your inbox.
               </p>
             </Card>
 
