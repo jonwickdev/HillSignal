@@ -99,6 +99,7 @@ async function sendDigest() {
   // Send emails
   let sent = 0
   let errors = 0
+  const debugInfo: any[] = []
   const resendKey = process.env.RESEND_API_KEY
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hillsignal.com'
 
@@ -133,7 +134,10 @@ async function sendDigest() {
       console.log(`[digest] User ${pref.user_id}: ${userSignals.length}/${beforeSector} after sector filter (sectors=${JSON.stringify(pref.sectors)})`)
     }
 
-    if (userSignals.length === 0) continue
+    if (userSignals.length === 0) {
+      debugInfo.push({ user_id: pref.user_id, freq: pref.email_frequency, sectors: pref.sectors, after_time: recentSignals.filter((s: any) => s.created_at >= cutoff).length, after_sector: 0, cutoff })
+      continue
+    }
 
     const topSignals = userSignals.slice(0, maxSignals)
 
