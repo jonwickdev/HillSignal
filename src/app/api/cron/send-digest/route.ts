@@ -175,6 +175,8 @@ async function sendDigest() {
     errors,
     eligible: eligibleUsers.length,
     signals: recentSignals.length,
+    v: 2,
+    cutoff_daily: oneDayAgo,
   })
 }
 
