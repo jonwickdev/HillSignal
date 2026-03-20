@@ -59,7 +59,8 @@ async function sendDigest() {
   // A daily digest promising "here's what's happening" must not include a 2-year-old contract.
   // USAspending returns modified old contracts as "recent" — this catches them.
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+  // 36h window (not 24h) — gives buffer for timing drift between poller and digest cron
+  const oneDayAgo = new Date(now.getTime() - 36 * 60 * 60 * 1000).toISOString()
   const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: recentSignals, error: sigError } = await supabase

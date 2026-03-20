@@ -11,10 +11,18 @@ import { createAdminClient } from '@/lib/supabase/server'
  * Vercel cron triggers this via GET.
  * Polls Congress.gov for recent activity, analyzes with RouteLLM, stores in Supabase.
  */
-export async function GET(request: Request) {
-  // Verify cron secret if set (Vercel sends this header)
+function isAuthorized(request: Request): boolean {
+  if (!process.env.CRON_SECRET) return true
   const authHeader = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) return true
+  // Also accept ?secret= query param (used by cron-job.org)
+  const url = new URL(request.url)
+  if (url.searchParams.get('secret') === process.env.CRON_SECRET) return true
+  return false
+}
+
+export async function GET(request: Request) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return runPoll()
@@ -22,8 +30,7 @@ export async function GET(request: Request) {
 
 /** POST handler for manual triggers — also requires cron secret */
 export async function POST(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return runPoll()
@@ -68,10 +75,14 @@ async function runPoll() {
       }
     }
 
-    // 1. Fetch from Congress.gov
+    // Time budget: hard stop at 50s to leave room for DB writes + response
+    const TIME_BUDGET_MS = 50_000
+    const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startTime)
+
+    // 1. Fetch from Congress.gov (reduced from 100 to 30 to fit in time budget)
     console.log('Polling Congress.gov...', fromDateTime ? `since ${fromDateTime}` : 'initial poll')
-    const rawItems = await fetchRecentBills(fromDateTime, 100)
-    console.log(`Fetched ${rawItems?.length ?? 0} items from Congress.gov`)
+    const rawItems = await fetchRecentBills(fromDateTime, 30)
+    console.log(`Fetched ${rawItems?.length ?? 0} items from Congress.gov (${Date.now() - startTime}ms elapsed)`)
 
     if ((rawItems?.length ?? 0) === 0) {
       await updatePollState(adminClient, 0, 0, null)
@@ -94,23 +105,43 @@ async function runPoll() {
       return NextResponse.json({ status: 'ok', message: 'All items already processed', items_fetched: rawItems?.length ?? 0 })
     }
 
+    // Time check before AI filter
+    if (timeLeft() < 10_000) {
+      console.log(`[cron] Time budget low (${timeLeft()}ms left), skipping AI steps`)
+      await updatePollState(adminClient, rawItems?.length ?? 0, 0, 'timeout_before_filter')
+      return NextResponse.json({ status: 'ok', message: 'Time budget exhausted before AI filter', items_fetched: rawItems?.length ?? 0, items_new: newItems?.length ?? 0, elapsed_ms: Date.now() - startTime })
+    }
+
     // 3. Pre-filter for market relevance (AI filter)
     const relevant = await filterForMarketRelevance(newItems ?? [])
-    console.log(`${relevant?.length ?? 0} items passed market-relevance filter`)
+    console.log(`${relevant?.length ?? 0} items passed market-relevance filter (${Date.now() - startTime}ms elapsed)`)
 
     if ((relevant?.length ?? 0) === 0) {
       await updatePollState(adminClient, rawItems?.length ?? 0, 0, null)
       return NextResponse.json({ status: 'ok', message: 'No market-relevant items', items_fetched: rawItems?.length ?? 0, items_new: newItems?.length ?? 0 })
     }
 
-    // 4. Enrich bills with full detail data (sponsors, subjects, CRS summaries)
-    const enriched = await enrichBillItems(relevant ?? [])
+    // Time check before enrichment
+    if (timeLeft() < 15_000) {
+      console.log(`[cron] Time budget low (${timeLeft()}ms left), skipping enrichment`)
+    }
 
-    // 5. Analyze with RouteLLM (max 20 items per poll)
-    const toAnalyze = enriched?.slice?.(0, 20) ?? []
+    // 4. Enrich bills only if time allows (enrichment is nice-to-have, analysis works without it)
+    const enriched = timeLeft() >= 15_000 ? await enrichBillItems(relevant ?? []) : relevant
+    console.log(`Enrichment ${timeLeft() >= 0 ? 'done' : 'skipped'} (${Date.now() - startTime}ms elapsed)`)
+
+    // Time check before analysis
+    if (timeLeft() < 10_000) {
+      console.log(`[cron] Time budget low (${timeLeft()}ms left), skipping analysis`)
+      await updatePollState(adminClient, rawItems?.length ?? 0, 0, 'timeout_before_analysis')
+      return NextResponse.json({ status: 'ok', message: 'Time budget exhausted before analysis', items_fetched: rawItems?.length ?? 0, items_new: newItems?.length ?? 0, items_relevant: relevant?.length ?? 0, elapsed_ms: Date.now() - startTime })
+    }
+
+    // 5. Analyze with RouteLLM — cap at 8 items and concurrency 2 to stay in budget
+    const toAnalyze = enriched?.slice?.(0, 8) ?? []
     console.log(`Analyzing ${toAnalyze?.length ?? 0} items with RouteLLM...`)
     const analyzed = await analyzeBatch(toAnalyze, 2)
-    console.log(`Got ${analyzed?.length ?? 0} analyses`)
+    console.log(`Got ${analyzed?.length ?? 0} analyses (${Date.now() - startTime}ms elapsed)`)
 
     // 5. Quality gate: skip low-impact or vague analyses
     const quality = (analyzed ?? []).filter((s: any) => {
