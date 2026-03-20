@@ -119,15 +119,18 @@ async function sendDigest() {
     let userSignals = recentSignals.filter(
       (s: any) => s.created_at >= cutoff
     )
+    console.log(`[digest] User ${pref.user_id}: ${userSignals.length} signals after time filter (cutoff=${cutoff}, freq=${pref.email_frequency})`)
 
     // If user has sector preferences, filter (but always include high-impact)
     if (pref.sectors && pref.sectors.length > 0) {
+      const beforeSector = userSignals.length
       userSignals = userSignals.filter((s: any) => {
         if (s.impact_score >= 8) return true
         return s.affected_sectors?.some((sec: string) =>
           pref.sectors.some((ps: string) => sec.toLowerCase().includes(ps.toLowerCase()))
         )
       })
+      console.log(`[digest] User ${pref.user_id}: ${userSignals.length}/${beforeSector} after sector filter (sectors=${JSON.stringify(pref.sectors)})`)
     }
 
     if (userSignals.length === 0) continue
@@ -175,8 +178,9 @@ async function sendDigest() {
     errors,
     eligible: eligibleUsers.length,
     signals: recentSignals.length,
-    v: 2,
+    v: 3,
     cutoff_daily: oneDayAgo,
+    newest_signal: recentSignals?.[0]?.created_at ?? null,
   })
 }
 
