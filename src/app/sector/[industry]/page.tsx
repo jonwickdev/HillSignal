@@ -56,10 +56,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export async function generateStaticParams() {
-  return VALID_SECTORS.map(s => ({ industry: s }))
-}
-
 export default async function SectorPage({ params }: Props) {
   const { industry } = await params
   const slug = industry.toLowerCase()
