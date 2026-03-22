@@ -36,3 +36,17 @@ export function extractIdFromSlug(slug: string): string {
   // Fallback: return the whole slug (let the DB query fail gracefully)
   return slug
 }
+
+/**
+ * Convert a ticker like "$NVDA" or "NVDA" to a URL path: /ticker/nvda
+ */
+export function tickerUrl(ticker: string): string {
+  return `/ticker/${ticker.replace(/^\$/, '').toLowerCase()}`
+}
+
+/**
+ * Convert a sector like "Real Estate" or "Defense" to a URL path: /sector/real-estate
+ */
+export function sectorUrl(sector: string): string {
+  return `/sector/${sector.toLowerCase().replace(/\s+/g, '-')}`
+}

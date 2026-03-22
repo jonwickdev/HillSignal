@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Card from '@/components/ui/Card'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import Link from 'next/link'
-import { generateSignalSlug } from '@/lib/slug'
+import { generateSignalSlug, tickerUrl, sectorUrl } from '@/lib/slug'
 
 interface FeaturedSignal {
   id: string
@@ -85,7 +85,7 @@ export default function SignalFeed({ signals }: { signals: FeaturedSignal[] }) {
                   <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex-1">
                       <p className="text-xs text-hill-muted font-mono mb-1">
-                        {sourceLabel} {sectors.length > 0 && `• ${sectors[0]}`} • {formatDate(signal.event_date)}
+                        {sourceLabel} {sectors.length > 0 && (<>{' • '}<Link href={sectorUrl(sectors[0])} className="text-hill-muted hover:text-hill-orange transition-colors" onClick={(e) => e.stopPropagation()}>{sectors[0]}</Link></>)} • {formatDate(signal.event_date)}
                       </p>
                       <h3 className="text-hill-white font-semibold leading-tight">
                         {signal.title}

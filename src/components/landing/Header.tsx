@@ -29,6 +29,9 @@ export default function Header() {
           <Link href="/blog" className="text-hill-muted hover:text-hill-white transition-colors">
             Blog
           </Link>
+          <Link href="/glossary" className="text-hill-muted hover:text-hill-white transition-colors">
+            Glossary
+          </Link>
           <Link href="/login" className="text-hill-muted hover:text-hill-white transition-colors">
             Login
           </Link>
@@ -83,6 +86,13 @@ export default function Header() {
               onClick={() => setIsMenuOpen(false)}
             >
               Blog
+            </Link>
+            <Link
+              href="/glossary"
+              className="block text-hill-muted hover:text-hill-white transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Glossary
             </Link>
             <Link
               href="/login"

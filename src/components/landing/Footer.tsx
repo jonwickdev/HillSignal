@@ -57,24 +57,24 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Resources & Legal */}
+            {/* Learn */}
             <div>
-              <h4 className="text-hill-white font-semibold mb-4">Resources</h4>
+              <h4 className="text-hill-white font-semibold mb-4">Learn</h4>
               <ul className="space-y-2 text-sm">
+                <li>
+                  <Link href="/glossary" className="text-hill-muted hover:text-hill-white transition-colors">
+                    Glossary
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/what-is-hillsignal" className="text-hill-muted hover:text-hill-white transition-colors">
+                    What is HillSignal?
+                  </Link>
+                </li>
                 <li>
                   <Link href="/faq" className="text-hill-muted hover:text-hill-white transition-colors">
                     FAQ
                   </Link>
-                </li>
-                <li>
-                  <a href="/privacy" className="text-hill-muted hover:text-hill-white transition-colors">
-                    Privacy Policy
-                  </a>
-                </li>
-                <li>
-                  <a href="/terms" className="text-hill-muted hover:text-hill-white transition-colors">
-                    Terms of Service
-                  </a>
                 </li>
                 <li>
                   <a href="mailto:support@hillsignal.com" className="text-hill-muted hover:text-hill-white transition-colors">
@@ -88,7 +88,7 @@ export default function Footer() {
           {/* Bottom */}
           <div className="pt-8 border-t border-hill-border flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-hill-muted text-sm">
-              © 2025 HillSignal. All rights reserved.
+              © 2026 HillSignal. All rights reserved.
             </p>
             <p className="text-hill-muted text-xs">
               Not financial advice. For informational purposes only.
