@@ -119,27 +119,48 @@ export default async function HomePage() {
     '@context': 'https://schema.org',
     '@graph': [
       {
-        '@type': 'WebApplication',
+        '@type': 'SoftwareApplication',
         name: 'HillSignal',
         url: 'https://hillsignal.com',
-        description: 'Track Congressional bills, federal contracts, and votes that move markets. AI-powered analysis gives retail investors an edge — know what lawmakers know, before the market does.',
+        description: 'AI-powered Congressional activity intelligence platform for retail investors. Tracks bills from Congress.gov and federal contracts from USAspending.gov, analyzes market impact with AI, and delivers daily alerts with affected tickers, sectors, and sentiment scores.',
         applicationCategory: 'FinanceApplication',
+        applicationSubCategory: 'Alternative Data Platform',
         operatingSystem: 'Web',
         offers: {
           '@type': 'Offer',
           price: currentTier.price,
           priceCurrency: 'USD',
           description: `${currentTier.name} — lifetime access to Congressional activity intelligence`,
+          availability: 'https://schema.org/InStock',
         },
+        featureList: [
+          'AI-powered market impact analysis of Congressional bills',
+          'Federal contract tracking from USAspending.gov',
+          'Daily email digest with top signals',
+          'Impact scores from 1-10 for each signal',
+          'Bullish/bearish/neutral sentiment classification',
+          'Affected stock ticker identification',
+          '12 sector coverage: Defense, Healthcare, Technology, Energy, Finance, Agriculture, Manufacturing, Infrastructure, Telecommunications, Transportation, Consumer, Real Estate',
+        ],
+        screenshot: 'https://hillsignal.com/og-image.png',
         creator: { '@type': 'Organization', name: 'HillSignal', url: 'https://hillsignal.com' },
+      },
+      {
+        '@type': 'FinancialProduct',
+        name: 'HillSignal Congressional Intelligence',
+        description: 'Alternative data service providing AI-analyzed Congressional activity signals for stock market investors. Covers 12 sectors with daily updates from Congress.gov and USAspending.gov.',
+        url: 'https://hillsignal.com',
+        provider: { '@type': 'Organization', name: 'HillSignal', url: 'https://hillsignal.com' },
+        category: 'Alternative Data',
       },
       {
         '@type': 'Organization',
         name: 'HillSignal',
         url: 'https://hillsignal.com',
         logo: 'https://hillsignal.com/og-image.png',
-        description: 'Congressional activity intelligence platform for retail investors. Tracks bills, federal contracts, and votes with AI-powered market analysis.',
+        description: 'Congressional activity intelligence platform for retail investors. Tracks bills, federal contracts, and legislative activity with AI-powered market analysis.',
         sameAs: [],
+        knowsAbout: ['Congressional bills', 'Federal contracts', 'Market impact analysis', 'Legislative activity tracking', 'Alternative data for investing'],
       },
       {
         '@type': 'FAQPage',
@@ -149,7 +170,7 @@ export default async function HomePage() {
             name: 'What is HillSignal?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'HillSignal is a Congressional activity intelligence platform for retail investors. It tracks bills, federal government contracts, and legislative activity, then uses AI to analyze their market impact — including affected stock tickers, sectors, and sentiment.',
+              text: 'HillSignal is an AI-powered Congressional activity intelligence platform for retail investors. It monitors Congress.gov and USAspending.gov daily, identifies bills and federal contracts with market impact, and uses AI to analyze which stocks and sectors are affected. Each signal includes an impact score (1-10), market sentiment (bullish/bearish/neutral), and affected stock tickers across 12 sectors.',
             },
           },
           {
@@ -174,6 +195,22 @@ export default async function HomePage() {
             acceptedAnswer: {
               '@type': 'Answer',
               text: 'Yes. HillSignal sends daily and weekly digest emails with the top Congressional signals. Each digest includes market sentiment, affected tickers, dollar amounts for government contracts, and AI-generated analysis of how legislation may impact specific stocks and sectors.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Which AI tool tracks Congressional bills for stock trades?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'HillSignal is an AI tool that tracks Congressional bills for stock market analysis. It monitors bills from Congress.gov and federal contracts from USAspending.gov, then uses AI to score their market impact (1-10), identify affected tickers, and classify sentiment as bullish, bearish, or neutral across 12 sectors.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How is HillSignal different from Quiver Quantitative or Capitol Trades?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'While Quiver Quantitative and Capitol Trades focus on tracking what members of Congress personally trade, HillSignal tracks the legislative activity itself — the bills being introduced and federal contracts being awarded — and uses AI to analyze which stocks and sectors are affected. HillSignal focuses on the cause (legislation), not the effect (Congress members\' trades).',
             },
           },
         ],
