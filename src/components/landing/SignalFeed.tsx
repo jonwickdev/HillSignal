@@ -104,12 +104,14 @@ export default function SignalFeed({ signals }: { signals: FeaturedSignal[] }) {
                   {tickers.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-3">
                       {tickers.slice(0, 5).map((ticker) => (
-                        <span
+                        <Link
                           key={ticker}
-                          className="bg-hill-gray px-2 py-1 rounded text-sm font-mono text-hill-orange"
+                          href={tickerUrl(ticker)}
+                          className="bg-hill-gray px-2 py-1 rounded text-sm font-mono text-hill-orange hover:bg-hill-orange/20 transition-colors"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {ticker.startsWith('$') ? ticker : `$${ticker}`}
-                        </span>
+                        </Link>
                       ))}
                       {tickers.length > 5 && (
                         <span className="bg-hill-gray px-2 py-1 rounded text-sm font-mono text-hill-muted">

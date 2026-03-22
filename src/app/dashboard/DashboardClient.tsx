@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import LiveIndicator from '@/components/ui/LiveIndicator'
 import { createClient } from '@/lib/supabase/client'
 import type { Signal } from '@/lib/types'
-import { generateSignalSlug } from '@/lib/slug'
+import { generateSignalSlug, tickerUrl, sectorUrl } from '@/lib/slug'
 import { ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, RefreshCw, Settings, Info, Star, X, Search, User, List, BarChart3, Calendar, SlidersHorizontal, DollarSign, Zap, FileText, Landmark } from 'lucide-react'
 
 const sentimentConfig: Record<string, { color: string; bg: string; border: string; label: string; Icon: any }> = {
@@ -643,7 +643,7 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                       </p>
                       <div className="flex items-center gap-2 mt-3">
                         {(signal.tickers ?? []).slice(0, 3).map((t: string) => (
-                          <span key={t} className="text-sm font-mono font-medium text-hill-orange">{t}</span>
+                          <Link key={t} href={tickerUrl(t)} className="text-sm font-mono font-medium text-hill-orange hover:underline" onClick={(e) => e.stopPropagation()}>{t}</Link>
                         ))}
                         <span className="ml-auto text-sm font-mono text-hill-muted">{signal.impact_score}/10</span>
                       </div>
@@ -977,10 +977,10 @@ export default function DashboardClient({ userEmail, preferences, stats }: Dashb
                         {((signal?.tickers?.length ?? 0) > 0 || (signal?.affected_sectors?.length ?? 0) > 0) && (
                           <div className="flex flex-wrap gap-2 mb-3">
                             {(signal?.tickers ?? [])?.map?.((ticker: string) => (
-                              <span key={ticker} className="bg-hill-gray px-2.5 py-1 rounded text-sm font-mono text-hill-orange font-medium">{ticker}</span>
+                              <Link key={ticker} href={tickerUrl(ticker)} className="bg-hill-gray px-2.5 py-1 rounded text-sm font-mono text-hill-orange font-medium hover:bg-hill-orange/20 transition-colors">{ticker}</Link>
                             ))}
                             {(signal?.affected_sectors ?? [])?.map?.((sector: string) => (
-                              <span key={sector} className="bg-hill-border/50 px-2.5 py-1 rounded text-sm text-hill-muted">{sector}</span>
+                              <Link key={sector} href={sectorUrl(sector)} className="bg-hill-border/50 px-2.5 py-1 rounded text-sm text-hill-muted hover:text-hill-white transition-colors">{sector}</Link>
                             ))}
                           </div>
                         )}

@@ -6,7 +6,7 @@ import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { Signal } from '@/lib/types'
 import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, Building, Users, FileText, Link2, DollarSign, FileBarChart, Share2, Check } from 'lucide-react'
-import { generateSignalSlug } from '@/lib/slug'
+import { generateSignalSlug, tickerUrl, sectorUrl } from '@/lib/slug'
 
 /** Fix malformed dollar amounts in titles (e.g., "$10410.5M" → "$10.4B") */
 function fixTitleDollars(title: string): string {
@@ -192,10 +192,10 @@ export default function SignalDetailClient({ signal, connectedSignals = [], isAu
         {(hasTickers || (signal?.affected_sectors?.length ?? 0) > 0) && (
           <div className="flex flex-wrap gap-2 mb-8">
             {(signal?.tickers ?? [])?.map?.((t: string) => (
-              <span key={t} className="bg-hill-orange/10 border border-hill-orange/30 text-hill-orange px-4 py-2 rounded-lg text-sm font-mono font-semibold">{t}</span>
+              <Link key={t} href={tickerUrl(t)} className="bg-hill-orange/10 border border-hill-orange/30 text-hill-orange px-4 py-2 rounded-lg text-sm font-mono font-semibold hover:bg-hill-orange/20 transition-colors">{t}</Link>
             ))}
             {(signal?.affected_sectors ?? [])?.map?.((s: string) => (
-              <span key={s} className="bg-hill-gray px-4 py-2 rounded-lg text-sm text-hill-text border border-hill-border">{s}</span>
+              <Link key={s} href={sectorUrl(s)} className="bg-hill-gray px-4 py-2 rounded-lg text-sm text-hill-text border border-hill-border hover:border-hill-orange/50 hover:text-hill-white transition-colors">{s}</Link>
             ))}
           </div>
         )}
