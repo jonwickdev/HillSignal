@@ -99,7 +99,6 @@ async function sendDigest() {
   // Send emails
   let sent = 0
   let errors = 0
-  const debugInfo: any[] = []
   const resendKey = process.env.RESEND_API_KEY
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hillsignal.com'
 
@@ -137,7 +136,7 @@ async function sendDigest() {
     }
 
     if (userSignals.length === 0) {
-      debugInfo.push({ user_id: pref.user_id, freq: pref.email_frequency, sectors: pref.sectors, after_time: recentSignals.filter((s: any) => new Date(s.created_at).getTime() >= cutoffMs).length, after_sector: 0, cutoff })
+      console.log(`[digest] User ${pref.user_id}: 0 signals after all filters — skipping`)
       continue
     }
 
@@ -184,10 +183,6 @@ async function sendDigest() {
     errors,
     eligible: eligibleUsers.length,
     signals: recentSignals.length,
-    v: 4,
-    cutoff_daily: oneDayAgo,
-    sample_created_at: recentSignals?.[0]?.created_at ?? null,
-    debug: debugInfo.length > 0 ? debugInfo : undefined,
   })
 }
 
