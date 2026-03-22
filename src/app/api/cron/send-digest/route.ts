@@ -117,8 +117,10 @@ async function sendDigest() {
     const maxSignals = isWeekly ? 10 : 5
 
     // Filter signals for this user's time window using created_at
+    // Use Date objects for comparison — string comparison is unreliable with mixed ISO formats (+00:00 vs Z)
+    const cutoffMs = new Date(cutoff).getTime()
     let userSignals = recentSignals.filter(
-      (s: any) => s.created_at >= cutoff
+      (s: any) => new Date(s.created_at).getTime() >= cutoffMs
     )
     console.log(`[digest] User ${pref.user_id}: ${userSignals.length} signals after time filter (cutoff=${cutoff}, freq=${pref.email_frequency})`)
 
@@ -135,7 +137,7 @@ async function sendDigest() {
     }
 
     if (userSignals.length === 0) {
-      debugInfo.push({ user_id: pref.user_id, freq: pref.email_frequency, sectors: pref.sectors, after_time: recentSignals.filter((s: any) => s.created_at >= cutoff).length, after_sector: 0, cutoff })
+      debugInfo.push({ user_id: pref.user_id, freq: pref.email_frequency, sectors: pref.sectors, after_time: recentSignals.filter((s: any) => new Date(s.created_at).getTime() >= cutoffMs).length, after_sector: 0, cutoff })
       continue
     }
 
@@ -182,9 +184,10 @@ async function sendDigest() {
     errors,
     eligible: eligibleUsers.length,
     signals: recentSignals.length,
-    v: 3,
+    v: 4,
     cutoff_daily: oneDayAgo,
-    newest_signal: recentSignals?.[0]?.created_at ?? null,
+    sample_created_at: recentSignals?.[0]?.created_at ?? null,
+    debug: debugInfo.length > 0 ? debugInfo : undefined,
   })
 }
 
